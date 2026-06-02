@@ -63,15 +63,14 @@ timeout /t 3 /nobreak >nul
 echo [START] Frontend server (port 5173)...
 start "DouyinKB-Frontend" cmd /k "cd /d %~dp0frontend && npm run dev"
 
+timeout /t 2 /nobreak >nul
+
 echo.
 echo ========================================
-echo   Services started!
+echo   Services started! Opening browser...
 echo ========================================
 echo.
-echo   Frontend: http://localhost:5173
-echo   Backend:  http://localhost:8000
-echo   API Docs: http://localhost:8000/docs
-echo.
-echo   Please open http://localhost:5173 in your browser manually.
-echo.
-pause
+
+start "" "http://localhost:5173"
+
+exit
