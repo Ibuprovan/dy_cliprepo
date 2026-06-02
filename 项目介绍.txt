@@ -1,0 +1,479 @@
+User:
+我该怎么使用你去创作一个可以程序，可以读取我的抖音的收藏，对每一个视频进行AI总结，并分类整理成知识库
+
+Kimi:
+这是一个很有创意的想法！让我帮你梳理一个完整的实现方案。
+核心挑战与解决思路
+最大的障碍：抖音官方没有提供”读取用户收藏”的开放API，且用户数据受严格保护。因此需要以下替代方案：
+
+方案一：浏览器扩展 + 本地AI（推荐，隐私最好）
+原理：用Chrome扩展在抖音网页版抓取收藏数据，本地处理。
+// content_script.js - 在抖音收藏页注入
+async function scrapeFavorites() {
+    const videos = [];
+    // 自动滚动加载所有收藏
+    while (hasMore) {
+        const items = document.querySelectorAll('[data-e2e="favorites-item"]');
+        for (let item of items) {
+            videos.push({
+                url: item.querySelector('a').href,
+                title: item.querySelector('.title').innerText,
+                author: item.querySelector('.author').innerText,
+                // 获取视频描述文本
+                desc: item.querySelector('.desc')?.innerText || ''
+            });
+        }
+        window.scrollBy(0, 1000);
+        await sleep(1000);
+    }
+    return videos;
+}
+本地AI处理（Python）：
+from transformers import pipeline
+import json
+
+# 使用轻量级本地模型做总结和分类
+classifier = pipeline("zero-shot-classification", model="MoritzLaurer/mDeBERTa-v3-base-mnli-xnli")
+summarizer = pipeline("summarization", model="facebook/bart-large-cnn")
+
+def process_video(video_info):
+    # 1. 总结内容（基于标题+描述）
+    text = f"{video_info['title']}. {video_info['desc']}"
+    summary = summarizer(text, max_length=100)[0]['summary_text']
+    
+    # 2. 分类到预设知识库
+    categories = ["编程技术", "生活技巧", "商业思维", "健康知识", "娱乐"]
+    result = classifier(text, categories)
+    
+    return {
+        "summary": summary,
+        "category": result['labels'][0],
+        "confidence": result['scores'][0],
+        "url": video_info['url']
+    }
+
+方案二：移动端自动化（适合手机重度用户）
+工具：Appium / UIAutomator2 控制安卓手机
+# 用uiautomator2控制抖音APP
+import uiautomator2 as u2
+
+d = u2.connect()  # 连接手机
+d.app_start("com.ss.android.ugc.aweme")
+
+# 进入"我" -> "收藏"
+d(text="我").click()
+d(text="收藏").click()
+
+# 遍历收藏列表（需要处理无限滚动）
+def scroll_and_collect():
+    videos = []
+    last_count = 0
+    while True:
+        current = d(className="android.widget.FrameLayout").count
+        if current == last_count:
+            break
+        # 提取当前屏幕视频信息...
+        d.swipe(0.5, 0.8, 0.5, 0.2)  # 上滑
+        last_count = current
+    return videos
+
+方案三：模拟”分享给自己”法（最简单）
+操作步骤： 1. 在抖音APP中，批量将收藏视频分享到微信文件传输助手或邮件 2. 用Python读取这些链接：
+import re
+import requests
+from bs4 import BeautifulSoup
+
+def extract_douyin_info(url):
+    # 解析分享链接获取视频信息
+    headers = {'User-Agent': 'Mozilla/5.0...'}
+    resp = requests.get(url, headers=headers, allow_redirects=True)
+    soup = BeautifulSoup(resp.text, 'html.parser')
+    
+    title = soup.find('meta', property='og:title')['content']
+    desc = soup.find('meta', property='og:description')['content']
+    return {"title": title, "desc": desc, "url": url}
+
+知识库构建（通用部分）
+无论你用哪种方案获取数据，后续整理逻辑相同：
+import sqlite3
+from datetime import datetime
+
+class KnowledgeBase:
+    def __init__(self):
+        self.conn = sqlite3.connect('douyin_kb.db')
+        self._init_db()
+    
+    def add_video(self, video_data):
+        # 存储到SQLite，支持全文搜索
+        cursor = self.conn.cursor()
+        cursor.execute('''
+            INSERT INTO videos 
+            (url, title, summary, category, tags, added_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+        ''', (
+            video_data['url'],
+            video_data['title'],
+            video_data['summary'],
+            video_data['category'],
+            ','.join(video_data.get('tags', [])),
+            datetime.now()
+        ))
+        self.conn.commit()
+    
+    def search(self, query):
+        # 支持语义搜索（需配合embedding模型）
+        cursor = self.conn.cursor()
+        cursor.execute('''
+            SELECT * FROM videos 
+            WHERE summary MATCH ? OR title MATCH ?
+        ''', (query, query))
+        return cursor.fetchall()
+
+推荐技术栈总结
+环节	推荐工具	说明
+数据获取	Playwright / Selenium	模拟浏览器行为，最稳定
+AI总结	GPT-4 API / Claude API	效果最佳；或本地Qwen2.5
+分类	向量数据库 (ChromaDB)	自动聚类相似内容
+知识库	Obsidian / Notion API	可视化整理；或本地SQLite
+部署	Python脚本 + 定时任务	每周自动同步一次
+
+关键提醒
+1.隐私安全：你的收藏可能包含个人兴趣，建议全程本地处理，避免将数据上传到第三方
+2.反爬风险：抖音有反爬机制，需控制请求频率，或使用已登录的Cookie
+3.法律合规：仅限个人学习使用，不要批量抓取他人数据
+如果你告诉我你的技术背景（会Python/JS？用Windows/Mac？），我可以给你一个更具体的、能直接运行的 starter 代码。
+
+User:
+我使用Windows11，我希望这个项目同时有前后端，结合你上文的想法，帮我详细规划安排项目逻辑与框架
+
+Kimi:
+基于 Windows 11 和前后端分离架构，我为你设计一套完整的 「抖音收藏 AI 知识库」 项目方案。这套架构兼顾了数据抓取、AI 处理、本地知识库管理和现代化 UI。
+
+一、总体架构设计
+┌─────────────────────────────────────────────────────────────┐
+│                        前端 (Frontend)                       │
+│  React 18 + TypeScript + Tailwind + Shadcn/ui              │
+│  - 收藏同步控制台                                           │
+│  - AI 总结看板（分类/标签/时间轴）                           │
+│  - 语义搜索引擎                                             │
+│  - 视频播放器嵌入                                           │
+└──────────────────────────┬──────────────────────────────────┘
+                         │  HTTP (FastAPI)
+┌──────────────────────────▼──────────────────────────────────┐
+│                        后端 (Backend)                        │
+│  Python FastAPI + SQLite + ChromaDB                         │
+│  - Playwright 数据采集服务                                   │
+│  - AI 处理管道 (Ollama/DeepSeek/OpenAI)                     │
+│  - 向量检索引擎                                             │
+└─────────────────────────────────────────────────────────────┘
+为什么这样选型： - FastAPI：异步高性能，天然支持 SSE（实时推送同步进度） - SQLite：零配置本地数据库，适合个人知识库 - ChromaDB：轻量级向量数据库，实现语义搜索 - Playwright：比 Selenium 更现代，能穿透抖音的反爬，且支持保存登录态 - React + Tauri（可选）：如果你最终想要一个 .exe 桌面程序，可以把前端打包成 Tauri 应用，但保持 Web 技术栈
+
+二、项目目录结构
+douyin-knowledge-base/
+├── backend/                          # Python 后端
+│   ├── app/
+│   │   ├── __init__.py
+│   │   ├── main.py                   # FastAPI 入口
+│   │   ├── config.py                 # 配置管理（模型选择、API Key）
+│   │   ├── database/
+│   │   │   ├── models.py             # SQLAlchemy 模型
+│   │   │   ├── sqlite_manager.py     # 数据库操作
+│   │   │   └── chroma_manager.py     # 向量数据库
+│   │   ├── scraper/
+│   │   │   ├── douyin_scraper.py     # Playwright 抓取核心
+│   │   │   └── auth_manager.py       # Cookie/登录态管理
+│   │   ├── ai/
+│   │   │   ├── summarizer.py         # AI 总结与分类
+│   │   │   ├── embedding.py          # 文本向量化
+│   │   │   └── prompts.py            # 所有 Prompt 模板
+│   │   ├── api/
+│   │   │   ├── videos.py             # 视频相关路由
+│   │   │   ├── sync.py               # 同步任务路由
+│   │   │   └── search.py             # 搜索路由
+│   │   └── services/
+│   │       └── sync_service.py       # 同步任务编排（核心逻辑）
+│   ├── requirements.txt
+│   └── alembic/                      # 数据库迁移
+│
+├── frontend/                         # React 前端
+│   ├── src/
+│   │   ├── components/
+│   │   │   ├── VideoCard.tsx         # 视频卡片
+│   │   │   ├── CategoryBoard.tsx     # 分类看板
+│   │   │   ├── SyncProgress.tsx      # 同步进度条
+│   │   │   └── SearchBar.tsx         # 语义搜索框
+│   │   ├── pages/
+│   │   │   ├── Dashboard.tsx         # 主控制台
+│   │   │   ├── Library.tsx           # 知识库浏览
+│   │   │   └── Settings.tsx          # 设置（AI模型配置）
+│   │   ├── hooks/
+│   │   │   ├── useSync.ts            # 同步任务 Hook
+│   │   │   └── useSearch.ts          # 搜索 Hook
+│   │   ├── api/
+│   │   │   └── client.ts             # axios 封装
+│   │   └── types/
+│   │       └── index.ts              # TypeScript 类型定义
+│   ├── package.json
+│   └── tailwind.config.js
+│
+├── docs/                             # 文档与 Prompt 工程记录
+└── README.md
+
+三、核心数据流与业务逻辑
+1. 同步任务流程（最关键）
+用户点击"同步收藏"
+    ↓
+后端启动 Playwright（无头/有头模式）
+    ↓
+打开抖音网页版 → 读取本地 Cookie（用户只需首次扫码登录）
+    ↓
+进入个人主页 → 点击"收藏"Tab
+    ↓
+无限滚动加载 + 去重（对比数据库已有 URL）
+    ↓
+对每个新视频：
+    ├── 提取：URL、标题、作者、点赞数、封面图、描述文本
+    ├── 下载封面图到本地（可选）
+    ├── 调用 AI 生成：总结(150字)、分类(如"编程/美食/心理学")、标签(3-5个)
+    ├── 生成文本 Embedding（用于语义搜索）
+    └── 写入 SQLite + ChromaDB
+    ↓
+通过 SSE 实时推送进度到前端
+    ↓
+前端刷新看板
+2. AI 处理管道设计
+Prompt 模板示例（backend/app/ai/prompts.py）：
+SUMMARY_PROMPT = """你是一个信息整理专家。请根据以下抖音视频信息，生成结构化总结。
+
+视频标题：{title}
+作者：{author}
+描述：{desc}
+
+请输出以下 JSON 格式（不要有任何其他文字）：
+{{
+    "summary": "用2-3句话总结核心知识点或价值（150字内）",
+    "category": "从以下选一个最贴切的：编程技术、AI人工智能、商业思维、心理学、生活技巧、健康知识、历史人文、娱乐搞笑、其他",
+    "tags": ["标签1", "标签2", "标签3"],
+    "key_points": ["要点1", "要点2", "要点3"],
+    "quality_score": 7  // 1-10，判断内容干货程度
+}}
+"""
+AI 引擎封装（支持多模型切换）：
+# backend/app/ai/summarizer.py
+import openai
+import json
+from typing import Optional
+
+class AIProcessor:
+    def __init__(self, provider: str = "ollama"):
+        self.provider = provider
+        # Ollama 本地服务（默认端口11434）
+        if provider == "ollama":
+            self.client = openai.OpenAI(base_url="http://localhost:11434/v1", api_key="ollama")
+            self.model = "qwen2.5:14b"  # 中文表现好，14B 在 16G 显存可跑
+        else:
+            self.client = openai.OpenAI(api_key="your-api-key")
+            self.model = "gpt-4o-mini"
+    
+    async def process_video(self, title: str, desc: str, author: str) -> dict:
+        prompt = SUMMARY_PROMPT.format(title=title, desc=desc, author=author)
+        
+        resp = self.client.chat.completions.create(
+            model=self.model,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.3,
+            response_format={"type": "json_object"} if self.provider != "ollama" else None
+        )
+        
+        return json.loads(resp.choices[0].message.content)
+
+四、数据库 Schema 设计
+# backend/app/database/models.py
+from sqlalchemy import Column, Integer, String, DateTime, Text, Float, JSON
+from sqlalchemy.ext.declarative import declarative_base
+
+Base = declarative_base()
+
+class Video(Base):
+    __tablename__ = "videos"
+    
+    id = Column(Integer, primary_key=True)
+    url = Column(String, unique=True, index=True)      # 抖音视频链接
+    title = Column(String)
+    author = Column(String)
+    author_id = Column(String)
+    desc = Column(Text)                                  # 原始描述
+    cover_path = Column(String)                          # 本地封面图路径
+    
+    # AI 生成字段
+    summary = Column(Text)                             # 总结
+    category = Column(String, index=True)              # 主分类
+    tags = Column(JSON)                                # 标签数组
+    key_points = Column(JSON)                          # 关键要点
+    quality_score = Column(Integer)                    # 质量分
+    
+    # 元数据
+    created_at = Column(DateTime)                      # 视频发布时间
+    favorited_at = Column(DateTime)                    # 用户收藏时间
+    synced_at = Column(DateTime)                       # 同步到知识库时间
+    
+    # 向量检索用（可选冗余存储）
+    embedding_id = Column(String)                      # ChromaDB 中的 ID
+ChromaDB 集合设计： - Collection: video_embeddings - Documents: "{title}. {summary}. 标签：{tags}"（用于语义匹配） - Metadatas: {"video_id": 123, "category": "编程技术", "url": "..."}
+
+五、关键 API 设计
+方法	路径	说明
+POST	/api/sync/start	启动同步任务，返回 task_id
+GET	/api/sync/status?task_id=xxx	SSE 流，实时返回进度
+POST	/api/sync/stop	中止同步
+GET	/api/videos	分页获取视频列表（支持 category/tag 筛选）
+GET	/api/videos/:id	获取单个视频详情
+POST	/api/search	语义搜索（查询向量化后在 Chroma 检索）
+GET	/api/stats	仪表盘统计（总数、分类分布、收藏趋势）
+POST	/api/ai/regenerate	对单个视频重新 AI 总结（调参后重跑）
+SSE 进度推送示例：
+# backend/app/api/sync.py
+from fastapi import APIRouter
+from fastapi.responses import StreamingResponse
+
+@router.get("/status")
+async def sync_status(task_id: str):
+    async def event_generator():
+        while task := task_manager.get(task_id):
+            yield f"data: {json.dumps({'progress': task.progress, 'current': task.current_title})}\n\n"
+            await asyncio.sleep(1)
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+六、前端页面规划
+1. Dashboard（控制台）
+•顶部统计卡片：总收藏数 | 本月新增 | 分类数 | 平均质量分
+•分类看板：网格展示各分类下的视频数量（点击穿透到列表）
+•最近同步：时间轴展示最近处理的 10 条视频
+2. Library（知识库）
+•左侧边栏：分类树 + 标签云
+•中间内容区：视频卡片网格（封面 + AI 总结 + 分类标签）
+•搜索栏：支持：
+–普通关键词搜索（SQLite LIKE）
+–语义搜索（ChromaDB：“找关于 Python 异步编程的内容”）
+–筛选器：按分类/标签/质量分/收藏时间
+3. Video Detail（视频详情页）
+•左侧：嵌入抖音网页播放器（或跳转链接）
+•右侧：AI 总结卡片 + 关键要点列表 + 原始描述
+•底部：同类推荐（基于向量相似度）
+4. Settings（设置）
+•AI 模型配置：Ollama 模型名 / OpenAI API Key
+•同步设置：每次同步数量限制、是否下载封面
+•数据管理：导出 JSON / 清空库
+
+七、Windows 11 环境部署指南
+第一步：环境准备
+# 1. 安装 Python 3.11+ 和 Node.js 18+
+# 2. 创建项目目录
+mkdir douyin-knowledge-base && cd douyin-knowledge-base
+
+# 3. 后端初始化
+cd backend
+python -m venv venv
+.\venv\Scripts\activate
+pip install fastapi uvicorn sqlalchemy chromadb playwright openai aiofiles python-multipart
+playwright install chromium  # 安装浏览器内核
+
+# 4. 前端初始化
+cd ../frontend
+npx create-vite@latest . --template react-ts
+npm install
+npm install axios tailwindcss @radix-ui/react-icons lucide-react
+第二步：抖音登录态处理（关键！）
+由于抖音需要登录才能看收藏，你需要：
+# backend/app/scraper/auth_manager.py
+# 方案 A：手动登录后保存 Cookie
+async def manual_login():
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(headless=False)  # 有头模式，让用户扫码
+        context = await browser.new_context()
+        page = await context.new_page()
+        await page.goto("https://www.douyin.com")
+        
+        print("请扫码登录，登录成功后按回车...")
+        input()
+        
+        # 保存 Cookie 到本地
+        cookies = await context.cookies()
+        with open("auth/douyin_cookies.json", "w") as f:
+            json.dump(cookies, f)
+        await browser.close()
+
+# 方案 B：后续同步时加载 Cookie
+async def load_auth_context(browser):
+    context = await browser.new_context()
+    if os.path.exists("auth/douyin_cookies.json"):
+        with open("auth/douyin_cookies.json") as f:
+            cookies = json.load(f)
+        await context.add_cookies(cookies)
+    return context
+第三步：启动命令
+# 终端 1：启动 Ollama（如果走本地模型，需先安装 Ollama Windows 版）
+ollama run qwen2.5:14b
+
+# 终端 2：启动后端
+cd backend
+.\venv\Scripts\activate
+uvicorn app.main:app --reload --port 8000
+
+# 终端 3：启动前端
+cd frontend
+npm run dev
+
+八、开发路线图（建议按此顺序实现）
+阶段	目标	预计时间
+MVP 0.1	后端：Playwright 手动抓取 + SQLite 存储 + 基础 API	2-3 天
+MVP 0.2	接入 AI（先 OpenAI API 或 DeepSeek，快速验证效果）	1-2 天
+MVP 0.3	前端：Dashboard + 视频列表 + 基础搜索	2-3 天
+V 0.4	接入 ChromaDB 语义搜索 + 分类看板	2 天
+V 0.5	支持 Ollama 本地模型 + 前端设置页	1-2 天
+V 0.6	自动同步任务 + SSE 进度推送 + 封面图下载	2 天
+V 1.0	打包优化：Tauri 封装成 .exe 桌面应用（可选）	2-3 天
+
+九、风险与应对
+风险	解决方案
+抖音反爬导致 Playwright 被封	控制滚动速度（每页停留 2-3 秒）、使用已登录态、限制单次同步数量
+AI 总结质量差	优化 Prompt + 允许用户在 UI 上手动编辑总结和分类
+视频描述为空，AI 无法总结	抓取评论区高赞评论作为补充文本输入给 AI
+收藏量过大（>1000）	分页同步 + 断点续传（记录上次同步位置）
+
+如果你确认这个架构，我可以直接为你生成： 1. 后端核心代码（FastAPI 入口 + Playwright 抓取器 + AI 处理） 2. 前端基础框架（React 路由 + API 封装 + Dashboard 页面） 3. 数据库初始化脚本
+你需要我先从哪部分开始？或者你希望我先给你一个 可运行的最小 Demo（只包含：扫码登录 → 抓取 10 条收藏 → AI 总结 → 前端展示）？
+
+User:
+先写一个description
+
+Kimi:
+这是一个完整的项目 Description，你可以直接用在 README.md 顶部或项目文档中：
+
+抖音收藏 AI 知识库（Douyin Knowledge Base）
+「让你的抖音收藏夹从吃灰的仓库，变成可检索、可分类、可复用的个人知识资产。」
+项目简介
+这是一个专为重度抖音用户设计的本地私有化知识管理工具。它通过浏览器自动化技术抓取你的抖音收藏视频，利用 AI 对视频内容进行智能总结、自动分类和标签提取，最终构建成一个支持语义搜索的结构化知识库。所有数据存储在本地，无需担心隐私泄露，也无需依赖抖音官方 API。
+核心能力
+能力	说明
+一键同步	自动登录抖音网页版，抓取收藏列表，支持断点续传和增量更新
+AI 智能总结	基于大语言模型（支持本地 Ollama / 云端 API）自动生成视频核心要点、干货评分
+自动分类体系	将杂乱的收藏自动归类到「编程技术 / 商业思维 / 生活技巧 / 心理学」等知识维度
+语义搜索引擎	不是简单的关键词匹配——输入”如何提高专注力”，能搜到相关的心理学和学习方法视频
+私有化部署	前后端完全本地运行，视频数据、AI 处理、向量数据库均不出境
+现代化看板	React 驱动的可视化界面，支持分类浏览、时间轴、标签云和质量筛选
+技术架构
+后端：Python FastAPI + Playwright（浏览器自动化）+ SQLAlchemy（SQLite）+ ChromaDB（向量检索）
+前端：React 18 + TypeScript + Tailwind CSS + Shadcn/ui
+AI 层：支持 Ollama 本地模型（推荐 Qwen2.5 / DeepSeek）或 OpenAI / DeepSeek API
+数据流：Playwright 抓取 → AI 总结与向量化 → SQLite 结构化存储 + ChromaDB 语义索引 → React 可视化消费
+适用场景
+•信息囤积症自救：收藏了 500+ 视频却从未回看，现在可以用 3 秒找到半年前收藏的某个技术教程
+•跨领域学习整理：同时关注编程、商业、健身、心理学，需要按主题建立个人知识图谱
+•内容创作者选题库：将收藏的爆款视频结构化，分析其标签和核心卖点，辅助自己的内容策划
+•本地知识备份：防止抖音账号异常或视频下架导致收藏丢失，建立本地可导出的知识档案
+设计理念
+「收藏不等于拥有，检索才能创造价值。」
+我们不追求替代抖音的娱乐体验，而是解决「收藏后遗忘」的信息管理痛点。通过 AI 将非结构化的短视频内容转化为结构化的知识节点，让你的每一次收藏都真正沉淀为认知资产。
+
+我需要你继续把它扩展成一份完整的 README.md（包含安装指南、截图占位、API 文档链接等），并且写成 GitHub 仓库的 About 简介（更简短版本）。
