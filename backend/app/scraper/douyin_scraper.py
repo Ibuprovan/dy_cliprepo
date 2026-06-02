@@ -14,6 +14,7 @@ class DouyinScraper:
         self.context: Optional[BrowserContext] = None
         self.page: Optional[Page] = None
         self._playwright = None
+        self._login_mode = False
 
     async def start(self, headless: bool = True):
         self._playwright = await async_playwright().start()
@@ -30,10 +31,21 @@ class DouyinScraper:
         self.page = await self.context.new_page()
 
     async def stop(self):
-        if self.browser:
-            await self.browser.close()
-        if self._playwright:
-            await self._playwright.stop()
+        try:
+            if self.browser:
+                await self.browser.close()
+        except Exception:
+            pass
+        try:
+            if self._playwright:
+                await self._playwright.stop()
+        except Exception:
+            pass
+        self.browser = None
+        self.context = None
+        self.page = None
+        self._playwright = None
+        self._login_mode = False
 
     async def check_login_status(self) -> bool:
         if not self.page:
@@ -56,14 +68,18 @@ class DouyinScraper:
             return False
 
     async def manual_login(self) -> dict:
-        await self.start(headless=False)
+        # 先关闭之前的浏览器
+        await self.stop()
 
         try:
+            await self.start(headless=False)
+            self._login_mode = True
+
             await self.page.goto("https://www.douyin.com", wait_until="networkidle")
 
             return {
                 "status": "waiting",
-                "message": "浏览器已打开，请使用抖音APP扫码登录。登录完成后请调用 /api/auth/confirm 接口。",
+                "message": "浏览器已打开，请使用抖音APP扫码登录。登录完成后请点击"确认登录"按钮。",
             }
         except Exception as e:
             await self.stop()
@@ -73,12 +89,19 @@ class DouyinScraper:
             }
 
     async def confirm_login(self) -> dict:
+        # 尝试获取当前的 context
         if not self.context:
-            return {"status": "error", "message": "浏览器未启动"}
+            # 如果没有 context，尝试重新检查
+            return {"status": "error", "message": "浏览器未启动，请先点击"扫码登录""}
 
         try:
+            # 保存 cookies
             await self.save_cookies()
+            self._login_mode = False
+
+            # 关闭浏览器
             await self.stop()
+
             return {"status": "success", "message": "登录态已保存"}
         except Exception as e:
             return {"status": "error", "message": f"保存登录态失败: {str(e)}"}
@@ -203,8 +226,11 @@ class DouyinScraper:
 
     async def save_cookies(self):
         if self.context:
-            cookies = await self.context.cookies()
-            auth_manager.save_cookies(cookies)
+            try:
+                cookies = await self.context.cookies()
+                auth_manager.save_cookies(cookies)
+            except Exception:
+                pass
 
 
 scraper = DouyinScraper()
