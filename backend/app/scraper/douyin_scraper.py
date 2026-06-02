@@ -79,7 +79,7 @@ class DouyinScraper:
 
             return {
                 "status": "waiting",
-                "message": "浏览器已打开，请使用抖音APP扫码登录。登录完成后请点击"确认登录"按钮。",
+                "message": "浏览器已打开，请使用抖音APP扫码登录。登录完成后请点击确认登录按钮。",
             }
         except Exception as e:
             await self.stop()
@@ -92,7 +92,7 @@ class DouyinScraper:
         # 尝试获取当前的 context
         if not self.context:
             # 如果没有 context，尝试重新检查
-            return {"status": "error", "message": "浏览器未启动，请先点击"扫码登录""}
+            return {"status": "error", "message": "浏览器未启动，请先点击扫码登录"}
 
         try:
             # 保存 cookies
