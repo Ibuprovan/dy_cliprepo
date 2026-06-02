@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { checkAuth, login, confirmLogin, logout, getStats } from '../api/client';
+import { checkAuth, login, confirmLogin, logout } from '../api/client';
 import type { AuthStatus } from '../types';
 
 interface ConfigStatus {
