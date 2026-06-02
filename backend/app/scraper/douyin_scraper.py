@@ -17,20 +17,42 @@ class DouyinScraper:
         self._login_mode = False
 
     async def start(self, headless: bool = True):
-        self._playwright = await async_playwright().start()
-        self.browser = await self._playwright.chromium.launch(headless=headless)
-        self.context = await self.browser.new_context(
-            viewport={"width": 1920, "height": 1080},
-            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        )
+        try:
+            self._playwright = await async_playwright().start()
+            
+            # 强制使用 Chromium
+            self.browser = await self._playwright.chromium.launch(
+                headless=headless,
+                args=['--disable-blink-features=AutomationControlled']
+            )
+            
+            self.context = await self.browser.new_context(
+                viewport={"width": 1920, "height": 1080},
+                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            )
 
-        cookies = auth_manager.load_cookies()
-        if cookies:
-            await self.context.add_cookies(cookies)
+            cookies = auth_manager.load_cookies()
+            if cookies:
+                await self.context.add_cookies(cookies)
 
-        self.page = await self.context.new_page()
+            self.page = await self.context.new_page()
+            return True
+        except Exception as e:
+            print(f"Failed to start browser: {e}")
+            await self.stop()
+            return False
 
     async def stop(self):
+        try:
+            if self.page:
+                await self.page.close()
+        except Exception:
+            pass
+        try:
+            if self.context:
+                await self.context.close()
+        except Exception:
+            pass
         try:
             if self.browser:
                 await self.browser.close()
@@ -55,16 +77,24 @@ class DouyinScraper:
             await self.page.goto("https://www.douyin.com", wait_until="domcontentloaded", timeout=30000)
             await asyncio.sleep(3)
 
+            # 检查是否已登录
             user_info = await self.page.query_selector('[data-e2e="user-info"]')
             if user_info:
                 return True
 
+            # 检查是否有登录按钮
             login_btn = await self.page.query_selector('[data-e2e="login-button"]')
             if login_btn:
                 return False
 
+            # 检查页面内容
+            content = await self.page.content()
+            if '登录' in content or 'login' in content.lower():
+                return False
+
             return False
-        except Exception:
+        except Exception as e:
+            print(f"Check login status failed: {e}")
             return False
 
     async def manual_login(self) -> dict:
@@ -72,10 +102,16 @@ class DouyinScraper:
         await self.stop()
 
         try:
-            await self.start(headless=False)
+            success = await self.start(headless=False)
+            if not success:
+                return {
+                    "status": "error",
+                    "message": "启动浏览器失败，请检查 Playwright 是否正确安装",
+                }
+            
             self._login_mode = True
 
-            # 使用更短的超时和更简单的等待策略
+            # 导航到抖音
             await self.page.goto("https://www.douyin.com", wait_until="domcontentloaded", timeout=30000)
             await asyncio.sleep(2)
 
@@ -91,19 +127,13 @@ class DouyinScraper:
             }
 
     async def confirm_login(self) -> dict:
-        # 尝试获取当前的 context
         if not self.context:
-            # 如果没有 context，尝试重新检查
             return {"status": "error", "message": "浏览器未启动，请先点击扫码登录"}
 
         try:
-            # 保存 cookies
             await self.save_cookies()
             self._login_mode = False
-
-            # 关闭浏览器
             await self.stop()
-
             return {"status": "success", "message": "登录态已保存"}
         except Exception as e:
             return {"status": "error", "message": f"保存登录态失败: {str(e)}"}
@@ -114,7 +144,9 @@ class DouyinScraper:
         on_progress: Optional[Callable] = None,
     ) -> list[dict]:
         if not self.page:
-            await self.start(headless=True)
+            success = await self.start(headless=True)
+            if not success:
+                raise Exception("启动浏览器失败")
 
         page = self.page
 
