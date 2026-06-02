@@ -3,9 +3,14 @@ from pathlib import Path
 from pydantic_settings import BaseSettings
 from dotenv import load_dotenv
 
-load_dotenv()
+# 获取 backend 目录路径
+BACKEND_DIR = Path(__file__).resolve().parent.parent
+ENV_FILE = BACKEND_DIR / ".env"
 
-BASE_DIR = Path(__file__).resolve().parent.parent
+# 加载 .env 文件
+load_dotenv(ENV_FILE)
+
+BASE_DIR = BACKEND_DIR
 
 
 class Settings(BaseSettings):
@@ -28,7 +33,7 @@ class Settings(BaseSettings):
     BACKEND_PORT: int = int(os.getenv("BACKEND_PORT", "8000"))
 
     class Config:
-        env_file = ".env"
+        env_file = str(ENV_FILE)
 
 
 settings = Settings()
