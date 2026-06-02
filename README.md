@@ -129,6 +129,8 @@ pip install -r requirements.txt
 playwright install chromium
 ```
 
+> **Windows 用户注意**：如果 ChromaDB 安装失败，请确保使用最新版本（>=1.5.0），该版本提供预编译的 Windows wheel，无需安装 C++ Build Tools。
+
 ### 前端安装
 
 ```bash

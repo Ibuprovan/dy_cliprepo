@@ -7,6 +7,7 @@ from app.database.sqlite_manager import db_manager
 from app.database.chroma_manager import chroma_manager
 from app.ai.summarizer import AIProcessor
 from app.scraper.douyin_scraper import scraper
+from app.scraper.auth_manager import auth_manager
 
 
 class SyncTask:
@@ -134,17 +135,17 @@ class SyncService:
         return False
 
     async def manual_login(self) -> dict:
-        result = await scraper.start(headless=False)
-        await scraper.page.goto("https://www.douyin.com", wait_until="networkidle")
-        return {
-            "status": "waiting",
-            "message": "浏览器已打开，请使用抖音APP扫码登录。登录完成后请调用 /api/auth/confirm 接口。",
-        }
+        return await scraper.manual_login()
 
     async def confirm_login(self) -> dict:
-        await scraper.save_cookies()
-        await scraper.stop()
-        return {"status": "success", "message": "登录态已保存"}
+        return await scraper.confirm_login()
+
+    async def check_login_status(self) -> dict:
+        is_logged_in = auth_manager.is_logged_in()
+        return {
+            "logged_in": is_logged_in,
+            "message": "已登录" if is_logged_in else "未登录，请先扫码登录",
+        }
 
 
 sync_service = SyncService()

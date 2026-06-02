@@ -1,5 +1,6 @@
 import asyncio
 import os
+import random
 from typing import Callable, Optional
 from playwright.async_api import async_playwright, Browser, BrowserContext, Page
 
@@ -12,6 +13,7 @@ class DouyinScraper:
         self.browser: Optional[Browser] = None
         self.context: Optional[BrowserContext] = None
         self.page: Optional[Page] = None
+        self._playwright = None
 
     async def start(self, headless: bool = True):
         self._playwright = await async_playwright().start()
@@ -33,111 +35,171 @@ class DouyinScraper:
         if self._playwright:
             await self._playwright.stop()
 
+    async def check_login_status(self) -> bool:
+        if not self.page:
+            return False
+
+        try:
+            await self.page.goto("https://www.douyin.com", wait_until="networkidle")
+            await asyncio.sleep(2)
+
+            user_info = await self.page.query_selector('[data-e2e="user-info"]')
+            if user_info:
+                return True
+
+            login_btn = await self.page.query_selector('[data-e2e="login-button"]')
+            if login_btn:
+                return False
+
+            return False
+        except Exception:
+            return False
+
+    async def manual_login(self) -> dict:
+        await self.start(headless=False)
+
+        try:
+            await self.page.goto("https://www.douyin.com", wait_until="networkidle")
+
+            return {
+                "status": "waiting",
+                "message": "浏览器已打开，请使用抖音APP扫码登录。登录完成后请调用 /api/auth/confirm 接口。",
+            }
+        except Exception as e:
+            await self.stop()
+            return {
+                "status": "error",
+                "message": f"打开浏览器失败: {str(e)}",
+            }
+
+    async def confirm_login(self) -> dict:
+        if not self.context:
+            return {"status": "error", "message": "浏览器未启动"}
+
+        try:
+            await self.save_cookies()
+            await self.stop()
+            return {"status": "success", "message": "登录态已保存"}
+        except Exception as e:
+            return {"status": "error", "message": f"保存登录态失败: {str(e)}"}
+
     async def scrape_favorites(
         self,
         max_count: Optional[int] = None,
         on_progress: Optional[Callable] = None,
     ) -> list[dict]:
         if not self.page:
-            await self.start(headless=False)
+            await self.start(headless=True)
 
         page = self.page
 
-        await page.goto("https://www.douyin.com", wait_until="networkidle")
-        await asyncio.sleep(2)
+        try:
+            await page.goto("https://www.douyin.com", wait_until="networkidle")
+            await asyncio.sleep(2)
 
-        user_link = await page.query_selector('[data-e2e="user-info"]')
-        if user_link:
-            href = await user_link.get_attribute("href")
-            if href:
-                user_url = f"https://www.douyin.com{href}" if href.startswith("/") else href
-                await page.goto(user_url, wait_until="networkidle")
+            is_logged_in = await self.check_login_status()
+            if not is_logged_in:
+                raise Exception("未登录，请先扫码登录")
+
+            user_link = await page.query_selector('[data-e2e="user-info"]')
+            if user_link:
+                href = await user_link.get_attribute("href")
+                if href:
+                    user_url = f"https://www.douyin.com{href}" if href.startswith("/") else href
+                    await page.goto(user_url, wait_until="networkidle")
+                    await asyncio.sleep(2)
+
+            fav_tab = await page.query_selector('[data-e2e="user-tab-favorite"]')
+            if fav_tab:
+                await fav_tab.click()
                 await asyncio.sleep(2)
 
-        fav_tab = await page.query_selector('[data-e2e="user-tab-favorite"]')
-        if fav_tab:
-            await fav_tab.click()
-            await asyncio.sleep(2)
+            videos = []
+            seen_urls = set()
+            no_new_count = 0
 
-        videos = []
-        seen_urls = set()
-        no_new_count = 0
-
-        while True:
-            if max_count and len(videos) >= max_count:
-                break
-
-            items = await page.query_selector_all('[data-e2e="user-post-list"] > div')
-
-            if not items:
-                items = await page.query_selector_all('div[class*="ECMy_UnAe"] > div')
-
-            new_this_round = 0
-            for item in items:
-                try:
-                    link = await item.query_selector("a")
-                    if not link:
-                        continue
-
-                    href = await link.get_attribute("href")
-                    if not href:
-                        continue
-
-                    url = href if href.startswith("http") else f"https://www.douyin.com{href}"
-
-                    if url in seen_urls:
-                        continue
-
-                    seen_urls.add(url)
-
-                    title_el = await item.query_selector('[class*="title"]') or await item.query_selector("a span")
-                    title = await title_el.inner_text() if title_el else ""
-
-                    author_el = await item.query_selector('[class*="author"]') or await item.query_selector('[class*="nickname"]')
-                    author = await author_el.inner_text() if author_el else ""
-
-                    desc_el = await item.query_selector('[class*="desc"]')
-                    desc = await desc_el.inner_text() if desc_el else ""
-
-                    cover_el = await item.query_selector("img")
-                    cover_url = await cover_el.get_attribute("src") if cover_el else ""
-
-                    video_data = {
-                        "url": url,
-                        "title": title.strip(),
-                        "author": author.strip(),
-                        "author_id": "",
-                        "desc": desc.strip(),
-                        "cover_url": cover_url,
-                    }
-
-                    videos.append(video_data)
-                    new_this_round += 1
-
-                    if on_progress:
-                        await on_progress({
-                            "type": "found",
-                            "total": len(videos),
-                            "current": video_data,
-                        })
-
-                    if max_count and len(videos) >= max_count:
-                        break
-
-                except Exception as e:
-                    continue
-
-            if new_this_round == 0:
-                no_new_count += 1
-                if no_new_count >= 3:
+            while True:
+                if max_count and len(videos) >= max_count:
                     break
-            else:
-                no_new_count = 0
 
-            await page.evaluate("window.scrollBy(0, 800)")
-            await asyncio.sleep(2)
+                items = await page.query_selector_all('[data-e2e="user-post-list"] > div')
 
-        return videos
+                if not items:
+                    items = await page.query_selector_all('div[class*="ECMy_UnAe"] > div')
+
+                if not items:
+                    items = await page.query_selector_all('ul li div[class*="Item"]')
+
+                new_this_round = 0
+                for item in items:
+                    try:
+                        link = await item.query_selector("a")
+                        if not link:
+                            continue
+
+                        href = await link.get_attribute("href")
+                        if not href:
+                            continue
+
+                        url = href if href.startswith("http") else f"https://www.douyin.com{href}"
+
+                        if url in seen_urls:
+                            continue
+
+                        seen_urls.add(url)
+
+                        title_el = await item.query_selector('[class*="title"]') or await item.query_selector("a span")
+                        title = await title_el.inner_text() if title_el else ""
+
+                        author_el = await item.query_selector('[class*="author"]') or await item.query_selector('[class*="nickname"]')
+                        author = await author_el.inner_text() if author_el else ""
+
+                        desc_el = await item.query_selector('[class*="desc"]')
+                        desc = await desc_el.inner_text() if desc_el else ""
+
+                        cover_el = await item.query_selector("img")
+                        cover_url = await cover_el.get_attribute("src") if cover_el else ""
+
+                        video_data = {
+                            "url": url,
+                            "title": title.strip(),
+                            "author": author.strip(),
+                            "author_id": "",
+                            "desc": desc.strip(),
+                            "cover_url": cover_url,
+                        }
+
+                        videos.append(video_data)
+                        new_this_round += 1
+
+                        if on_progress:
+                            await on_progress({
+                                "type": "found",
+                                "total": len(videos),
+                                "current": video_data,
+                            })
+
+                        if max_count and len(videos) >= max_count:
+                            break
+
+                    except Exception as e:
+                        continue
+
+                if new_this_round == 0:
+                    no_new_count += 1
+                    if no_new_count >= 3:
+                        break
+                else:
+                    no_new_count = 0
+
+                scroll_distance = random.randint(600, 1000)
+                await page.evaluate(f"window.scrollBy(0, {scroll_distance})")
+                await asyncio.sleep(random.uniform(1.5, 3.0))
+
+            return videos
+
+        except Exception as e:
+            raise Exception(f"抓取失败: {str(e)}")
 
     async def save_cookies(self):
         if self.context:
