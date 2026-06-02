@@ -7,15 +7,21 @@ from app.services.sync_service import sync_service
 
 router = APIRouter(prefix="/api/sync", tags=["sync"])
 
+MAX_SYNC_VIDEOS = 500  # 单次最大同步数量
+
 
 @router.post("/start")
-async def start_sync(max_videos: int = Query(None, description="最大同步数量")):
+async def start_sync(max_videos: int = Query(None, ge=1, le=MAX_SYNC_VIDEOS, description="最大同步数量")):
     for task in sync_service.tasks.values():
         if task.status == "running":
             raise HTTPException(status_code=409, detail="已有同步任务正在运行")
 
+    # 默认限制为 100
+    if max_videos is None:
+        max_videos = 100
+
     task_id = await sync_service.start_sync(max_videos=max_videos)
-    return {"task_id": task_id, "status": "running", "message": "同步任务已启动"}
+    return {"task_id": task_id, "status": "running", "message": "同步任务已启动", "max_videos": max_videos}
 
 
 @router.get("/status")

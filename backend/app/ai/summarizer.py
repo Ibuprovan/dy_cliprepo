@@ -1,5 +1,6 @@
 import json
 import re
+import httpx
 from typing import Optional
 from openai import OpenAI
 
@@ -14,20 +15,39 @@ class AIProcessor:
 
     def _init_client(self):
         if self.provider == "ollama":
+            if not self._check_ollama_available():
+                raise Exception(
+                    "Ollama 服务未启动或不可用。请先安装并启动 Ollama：\n"
+                    "1. 访问 https://ollama.ai 下载安装\n"
+                    "2. 运行 'ollama serve' 启动服务\n"
+                    "3. 运行 'ollama pull qwen2.5:14b' 拉取模型"
+                )
             self.client = OpenAI(
                 base_url=settings.OLLAMA_BASE_URL,
                 api_key="ollama",
             )
             self.model = settings.OLLAMA_MODEL
         elif self.provider == "deepseek":
+            if not settings.DEEPSEEK_API_KEY:
+                raise Exception("DeepSeek API Key 未配置，请在 .env 文件中设置 DEEPSEEK_API_KEY")
             self.client = OpenAI(
                 base_url=settings.DEEPSEEK_BASE_URL,
                 api_key=settings.DEEPSEEK_API_KEY,
             )
             self.model = settings.DEEPSEEK_MODEL
         else:
+            if not settings.OPENAI_API_KEY:
+                raise Exception("OpenAI API Key 未配置，请在 .env 文件中设置 OPENAI_API_KEY")
             self.client = OpenAI(api_key=settings.OPENAI_API_KEY)
             self.model = settings.OPENAI_MODEL
+
+    def _check_ollama_available(self) -> bool:
+        try:
+            base_url = settings.OLLAMA_BASE_URL.replace("/v1", "")
+            response = httpx.get(f"{base_url}/api/tags", timeout=5)
+            return response.status_code == 200
+        except Exception:
+            return False
 
     async def process_video(self, title: str, desc: str, author: str) -> dict:
         if desc and desc.strip():
@@ -41,6 +61,7 @@ class AIProcessor:
                     model=self.model,
                     messages=[{"role": "user", "content": prompt}],
                     temperature=0.3,
+                    timeout=60,
                 )
 
                 content = response.choices[0].message.content
