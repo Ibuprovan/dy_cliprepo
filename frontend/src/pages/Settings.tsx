@@ -1,14 +1,22 @@
 import { useEffect, useState } from 'react';
-import { checkAuth, login, confirmLogin, logout } from '../api/client';
+import { checkAuth, login, confirmLogin, logout, getStats } from '../api/client';
 import type { AuthStatus } from '../types';
+
+interface ConfigStatus {
+  ai_provider: string;
+  has_api_key: boolean;
+  api_key_preview: string | null;
+}
 
 export default function Settings() {
   const [auth, setAuth] = useState<AuthStatus | null>(null);
+  const [config, setConfig] = useState<ConfigStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
 
   useEffect(() => {
     loadAuth();
+    loadConfig();
   }, []);
 
   async function loadAuth() {
@@ -19,6 +27,16 @@ export default function Settings() {
       console.error('Failed to check auth:', e);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function loadConfig() {
+    try {
+      const res = await fetch('/api/stats/config');
+      const data = await res.json();
+      setConfig(data);
+    } catch (e) {
+      console.error('Failed to load config:', e);
     }
   }
 
@@ -57,6 +75,44 @@ export default function Settings() {
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       <h1 className="text-2xl font-bold text-gray-900">设置</h1>
+
+      <div className="bg-white rounded-lg border p-6">
+        <h2 className="text-lg font-semibold mb-4">AI 模型配置状态</h2>
+        {config ? (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-gray-600">AI Provider</span>
+              <span className="font-medium">{config.ai_provider}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-gray-600">API Key 状态</span>
+              <span className={`font-medium ${config.has_api_key ? 'text-green-600' : 'text-red-600'}`}>
+                {config.has_api_key ? '已配置' : '未配置'}
+              </span>
+            </div>
+            {config.api_key_preview && (
+              <div className="flex items-center justify-between">
+                <span className="text-gray-600">API Key</span>
+                <span className="font-mono text-sm">{config.api_key_preview}</span>
+              </div>
+            )}
+            {!config.has_api_key && config.ai_provider !== 'ollama' && (
+              <div className="p-3 bg-yellow-50 text-yellow-700 rounded-lg text-sm">
+                <p className="font-semibold mb-1">需要配置 API Key</p>
+                <p>请编辑 <code className="bg-yellow-100 px-1 rounded">backend/.env</code> 文件，填入您的 API Key：</p>
+                <pre className="mt-2 bg-yellow-100 p-2 rounded text-xs">
+{config.ai_provider === 'deepseek' 
+  ? 'DEEPSEEK_API_KEY=sk-你的API密钥' 
+  : 'OPENAI_API_KEY=你的API密钥'}
+                </pre>
+                <p className="mt-2">配置完成后请重启后端服务。</p>
+              </div>
+            )}
+          </div>
+        ) : (
+          <p className="text-gray-500">加载中...</p>
+        )}
+      </div>
 
       <div className="bg-white rounded-lg border p-6">
         <h2 className="text-lg font-semibold mb-4">抖音登录</h2>
@@ -118,34 +174,11 @@ export default function Settings() {
       </div>
 
       <div className="bg-white rounded-lg border p-6">
-        <h2 className="text-lg font-semibold mb-4">AI 模型配置</h2>
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm text-gray-600 mb-1">AI Provider</label>
-            <p className="text-sm text-gray-500">
-              在后端 .env 文件中配置 AI_PROVIDER（ollama / openai / deepseek）
-            </p>
-          </div>
-          <div>
-            <label className="block text-sm text-gray-600 mb-1">Ollama 模型</label>
-            <p className="text-sm text-gray-500">
-              在后端 .env 文件中配置 OLLAMA_MODEL（默认 qwen2.5:14b）
-            </p>
-          </div>
-          <div>
-            <label className="block text-sm text-gray-600 mb-1">API Key</label>
-            <p className="text-sm text-gray-500">
-              在后端 .env 文件中配置 OPENAI_API_KEY 或 DEEPSEEK_API_KEY
-            </p>
-          </div>
+        <h2 className="text-lg font-semibold mb-4">配置说明</h2>
+        <div className="space-y-2 text-sm text-gray-600">
+          <p>配置文件位置：<code className="bg-gray-100 px-1 rounded">backend/.env</code></p>
+          <p>修改配置后需要重启后端服务才能生效。</p>
         </div>
-      </div>
-
-      <div className="bg-white rounded-lg border p-6">
-        <h2 className="text-lg font-semibold mb-4">数据管理</h2>
-        <p className="text-sm text-gray-500 mb-4">
-          数据导出和清空功能将在后续版本中提供。
-        </p>
       </div>
     </div>
   );
