@@ -52,8 +52,8 @@ class DouyinScraper:
             return False
 
         try:
-            await self.page.goto("https://www.douyin.com", wait_until="networkidle")
-            await asyncio.sleep(2)
+            await self.page.goto("https://www.douyin.com", wait_until="domcontentloaded", timeout=30000)
+            await asyncio.sleep(3)
 
             user_info = await self.page.query_selector('[data-e2e="user-info"]')
             if user_info:
@@ -75,7 +75,9 @@ class DouyinScraper:
             await self.start(headless=False)
             self._login_mode = True
 
-            await self.page.goto("https://www.douyin.com", wait_until="networkidle")
+            # 使用更短的超时和更简单的等待策略
+            await self.page.goto("https://www.douyin.com", wait_until="domcontentloaded", timeout=30000)
+            await asyncio.sleep(2)
 
             return {
                 "status": "waiting",
@@ -117,8 +119,8 @@ class DouyinScraper:
         page = self.page
 
         try:
-            await page.goto("https://www.douyin.com", wait_until="networkidle")
-            await asyncio.sleep(2)
+            await page.goto("https://www.douyin.com", wait_until="domcontentloaded", timeout=30000)
+            await asyncio.sleep(3)
 
             is_logged_in = await self.check_login_status()
             if not is_logged_in:
@@ -129,7 +131,7 @@ class DouyinScraper:
                 href = await user_link.get_attribute("href")
                 if href:
                     user_url = f"https://www.douyin.com{href}" if href.startswith("/") else href
-                    await page.goto(user_url, wait_until="networkidle")
+                    await page.goto(user_url, wait_until="domcontentloaded", timeout=30000)
                     await asyncio.sleep(2)
 
             fav_tab = await page.query_selector('[data-e2e="user-tab-favorite"]')
