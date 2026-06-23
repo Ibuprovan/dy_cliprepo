@@ -11,9 +11,9 @@ dist/
 build/
 .env
 
-# Data
+# Data (sensitive/local)
 backend/data/
-backend/auth/*.json
+backend/auth/
 
 # Node
 node_modules/
@@ -32,3 +32,9 @@ Thumbs.db
 
 # Logs
 *.log
+
+# MiMoCode
+.mimocode/
+
+# Backup
+*.backup

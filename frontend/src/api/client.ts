@@ -1,76 +1,81 @@
-import axios from 'axios';
-import type {
-  VideoListResponse,
-  Video,
-  Stats,
-  SearchResult,
-  AuthStatus,
-} from '../types';
+/**
+ * API 客户端封装
+ * 使用 Vite proxy，无需硬编码后端地址
+ */
 
-const api = axios.create({
-  baseURL: '/api',
-  timeout: 30000,
-});
+const API_BASE = '';  // 使用 Vite proxy，相对路径即可
 
-export async function checkAuth(): Promise<AuthStatus> {
-  const res = await api.get('/auth/status');
-  return res.data;
+interface RequestOptions {
+  method?: string;
+  body?: unknown;
+  headers?: Record<string, string>;
 }
 
-export async function login(): Promise<{ status: string; message: string }> {
-  const res = await api.post('/auth/login');
-  return res.data;
+async function request<T>(endpoint: string, options: RequestOptions = {}): Promise<T> {
+  const { method = 'GET', body, headers = {} } = options;
+
+  const response = await fetch(`${API_BASE}${endpoint}`, {
+    method,
+    headers: {
+      'Content-Type': 'application/json',
+      ...headers,
+    },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: '请求失败' }));
+    throw new Error(error.detail || `HTTP ${response.status}`);
+  }
+
+  return response.json();
 }
 
-export async function confirmLogin(): Promise<{ status: string; message: string }> {
-  const res = await api.post('/auth/confirm');
-  return res.data;
+// 健康检查
+export async function checkHealth() {
+  return request<{ status: string; auth_exists: boolean }>('/health');
 }
 
-export async function logout(): Promise<{ status: string; message: string }> {
-  const res = await api.post('/auth/logout');
-  return res.data;
+// 获取视频列表
+export async function getVideos(limit = 100, offset = 0, category?: string) {
+  const params = new URLSearchParams({ limit: String(limit), offset: String(offset) });
+  if (category) params.append('category', category);
+  return request<{ items: unknown[]; total: number }>(`/api/videos?${params}`);
 }
 
-export async function startSync(maxVideos?: number): Promise<{ task_id: string; status: string }> {
-  const params = maxVideos ? { max_videos: maxVideos } : {};
-  const res = await api.post('/sync/start', null, { params });
-  return res.data;
+// 启动同步
+export async function startSync(limit = 10) {
+  return request<{ task_id: string; status: string; message: string }>(
+    `/api/sync/start?limit=${limit}`,
+    { method: 'POST' }
+  );
 }
 
-export async function stopSync(taskId: string): Promise<{ message: string }> {
-  const res = await api.post('/sync/stop', null, { params: { task_id: taskId } });
-  return res.data;
+// 停止同步
+export async function stopSync(taskId?: string) {
+  const params = taskId ? `?task_id=${taskId}` : '';
+  return request<{ message: string; task_id: string }>(
+    `/api/sync/stop${params}`,
+    { method: 'POST' }
+  );
 }
 
-export async function getVideos(params: {
-  page?: number;
-  size?: number;
-  category?: string;
-  tag?: string;
-  min_quality?: number;
-  sort_by?: string;
-  sort_order?: string;
-} = {}): Promise<VideoListResponse> {
-  const res = await api.get('/videos', { params });
-  return res.data;
-}
+// 创建 SSE 连接
+export function createSyncSSE(taskId: string, onMessage: (data: unknown) => void) {
+  const eventSource = new EventSource(`/api/sync/status/${taskId}`);
 
-export async function getVideoById(id: number): Promise<Video> {
-  const res = await api.get(`/videos/${id}`);
-  return res.data;
-}
+  eventSource.onmessage = (event) => {
+    try {
+      const data = JSON.parse(event.data);
+      onMessage(data);
+    } catch {
+      // 忽略解析错误
+    }
+  };
 
-export async function searchVideos(query: string, limit = 10, mode = 'semantic'): Promise<SearchResult> {
-  const res = await api.post('/search', { query, limit, mode });
-  return res.data;
-}
+  eventSource.onerror = () => {
+    eventSource.close();
+  };
 
-export async function getStats(): Promise<Stats> {
-  const res = await api.get('/stats');
-  return res.data;
-}
-
-export function createSyncEventSource(taskId: string): EventSource {
-  return new EventSource(`/api/sync/status?task_id=${taskId}`);
+  return eventSource;
 }

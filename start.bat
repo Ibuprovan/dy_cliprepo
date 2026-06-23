@@ -2,75 +2,143 @@
 chcp 65001 >nul 2>&1
 setlocal enabledelayedexpansion
 
-cd /d "%~dp0"
+echo.
+echo ========================================
+echo   �����ղ� AI ֪ʶ�� - �����ű�
+echo ========================================
+echo.
 
-echo [1/6] Checking Python...
+cd /d "%~dp0"
+echo ��ǰĿ¼: %CD%
+echo.
+
+REM ������־Ŀ¼
+if not exist "data\logs" mkdir "data\logs"
+
+REM ���Python
+echo [1/6] ��� Python...
 python --version >nul 2>&1
 if errorlevel 1 (
-    echo [ERROR] Python not found
+    echo [FAIL] Python δ��װ
+    echo ��� https://www.python.org/downloads/ ��װ Python 3.10+
+    echo.
     pause
     exit /b 1
 )
+for /f "tokens=2" %%i in ('python --version 2^>^&1') do set PYTHON_VERSION=%%i
+echo [OK] Python �汾: %PYTHON_VERSION%
+echo.
 
-echo [2/6] Checking Node.js...
+REM ���Node.js
+echo [2/6] ��� Node.js...
 node --version >nul 2>&1
 if errorlevel 1 (
-    echo [ERROR] Node.js not found
+    echo [FAIL] Node.js δ��װ
+    echo ��� https://nodejs.org/ ��װ Node.js 18+
+    echo.
     pause
     exit /b 1
 )
+for /f %%i in ('node --version 2^>^&1') do set NODE_VERSION=%%i
+echo [OK] Node.js �汾: %NODE_VERSION%
+echo.
 
-echo [3/6] Checking backend virtual environment...
-if not exist "backend\venv" (
+REM ��鲢����������⻷��
+echo [3/6] ����˻���...
+if not exist "backend\venv\Scripts\activate.bat" (
+    echo �������⻷��...
     cd backend
-    python -m venv venv
+    python -m venv venv >> "..\data\logs\start.log" 2>&1
+    if errorlevel 1 (
+        echo [FAIL] �������⻷��ʧ��
+        echo �鿴��־: data\logs\start.log
+        pause
+        exit /b 1
+    )
     cd ..
 )
+echo [OK] ���⻷������
+echo.
 
-echo [4/6] Installing backend dependencies...
+REM ��װ�������
+echo [4/6] ��װ�������...
 cd backend
 call venv\Scripts\activate.bat
-pip install -r requirements.txt -q
-cd ..
-
-echo [5/6] Checking Playwright browser...
-cd backend
-call venv\Scripts\activate.bat
-python -c "from playwright.sync_api import sync_playwright; p = sync_playwright().start(); b = p.chromium.launch(headless=True); b.close(); p.stop()" >nul 2>&1
+pip install -r requirements.txt -q >> "..\data\logs\start.log" 2>&1
 if errorlevel 1 (
-    playwright install chromium
+    echo [WARNING] ����������װ����ʧ�ܣ���������...
 )
 cd ..
+echo [OK] ��������Ѱ�װ
+echo.
 
-echo [6/6] Installing frontend dependencies...
+REM ��鲢��װǰ������
+echo [5/6] ���ǰ�˻���...
 if not exist "frontend\node_modules" (
+    echo ��װǰ������...
     cd frontend
-    npm install
+    call npm install >> "..\data\logs\start.log" 2>&1
+    if errorlevel 1 (
+        echo [FAIL] ǰ��������װʧ��
+        echo �鿴��־: data\logs\start.log
+        pause
+        exit /b 1
+    )
     cd ..
 )
-
-echo.
-echo ========================================
-echo   Services starting...
-echo ========================================
+echo [OK] ǰ�������Ѱ�װ
 echo.
 
-echo [START] Backend server (port 8000)...
-start "DouyinKB-Backend" cmd /k "cd /d %~dp0backend && call venv\Scripts\activate.bat && python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+REM ����¼̬
+echo [6/6] ����¼̬...
+if exist "backend\data\douyin_auth.json" (
+    echo [OK] ��¼̬�ļ�����
+) else (
+    echo [WARNING] ��¼̬�ļ�������
+    echo ��������: cd backend ^&^& python login_manual.py
+    echo.
+)
+echo.
 
+echo ========================================
+echo   ��������...
+echo ========================================
+echo.
+
+REM ������ˣ�ʹ��cmd /k��ֹ���ڹرգ�
+echo ������˷��� (�˿� 8000)...
+start "Backend" cmd /k "cd /d %~dp0backend && call venv\Scripts\activate.bat && python run_server.py"
+
+REM �ȴ��������
+echo �ȴ��������...
+timeout /t 5 /nobreak >nul
+
+REM ����ǰ�ˣ�ʹ��cmd /k��ֹ���ڹرգ�
+echo ����ǰ�˷��� (�˿� 5173)...
+start "Frontend" cmd /k "cd /d %~dp0frontend && npm run dev"
+
+REM �ȴ�ǰ������
+echo �ȴ�ǰ������...
 timeout /t 3 /nobreak >nul
 
-echo [START] Frontend server (port 5173)...
-start "DouyinKB-Frontend" cmd /k "cd /d %~dp0frontend && npm run dev"
-
-timeout /t 2 /nobreak >nul
-
 echo.
 echo ========================================
-echo   Services started! Opening browser...
+echo   ������������
+echo ========================================
+echo.
+echo   ��˵�ַ: http://localhost:8000
+echo   ǰ�˵�ַ: http://localhost:5173
+echo   API�ĵ�:  http://localhost:8000/docs
+echo.
+echo   ����� http://localhost:5173 ʹ��
+echo.
+echo   ��Ҫ�رձ����ڣ�
 echo ========================================
 echo.
 
+REM �������
 start "" "http://localhost:5173"
 
-exit
+REM ���ִ��ڴ�
+
+pause >nul

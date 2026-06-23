@@ -1,64 +1,106 @@
-import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom';
-import Dashboard from './pages/Dashboard';
-import Library from './pages/Library';
-import VideoDetail from './pages/VideoDetail';
-import Settings from './pages/Settings';
+/**
+ * 抖音收藏AI知识库 - 主应用
+ * 使用 Tailwind CSS 和组件化架构
+ */
 
-function Layout({ children }: { children: React.ReactNode }) {
-  const location = useLocation();
-
-  const navItems = [
-    { path: '/', label: '控制台', icon: '📊' },
-    { path: '/library', label: '知识库', icon: '📚' },
-    { path: '/settings', label: '设置', icon: '⚙️' },
-  ];
-
-  return (
-    <div className="min-h-screen bg-gray-50">
-      <nav className="bg-white border-b">
-        <div className="max-w-7xl mx-auto px-4">
-          <div className="flex items-center justify-between h-16">
-            <Link to="/" className="flex items-center gap-2">
-              <span className="text-xl">🎬</span>
-              <span className="font-bold text-gray-900">抖音知识库</span>
-            </Link>
-            <div className="flex items-center gap-1">
-              {navItems.map((item) => (
-                <Link
-                  key={item.path}
-                  to={item.path}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    location.pathname === item.path
-                      ? 'bg-blue-50 text-blue-700'
-                      : 'text-gray-600 hover:bg-gray-100'
-                  }`}
-                >
-                  <span className="mr-1">{item.icon}</span>
-                  {item.label}
-                </Link>
-              ))}
-            </div>
-          </div>
-        </div>
-      </nav>
-      <main className="max-w-7xl mx-auto px-4 py-6">
-        {children}
-      </main>
-    </div>
-  );
-}
+import { useState, useEffect, useCallback } from 'react';
+import { checkHealth, getVideos } from './api/client';
+import { useSync } from './hooks/useSync';
+import { Layout } from './components/Layout';
+import { SyncPanel } from './components/SyncPanel';
+import { VideoTable } from './components/VideoTable';
+import type { Video } from './types';
 
 export default function App() {
-  return (
-    <BrowserRouter>
+  const [backendOk, setBackendOk] = useState<boolean | null>(null);
+  const [authExists, setAuthExists] = useState(false);
+  const [videos, setVideos] = useState<Video[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // 加载视频列表
+  const loadVideos = useCallback(async () => {
+    try {
+      const data = await getVideos();
+      setVideos(data.items as Video[]);
+    } catch {
+      // 忽略错误
+    }
+  }, []);
+
+  // 同步完成回调
+  const handleSyncComplete = useCallback(() => {
+    loadVideos();
+  }, [loadVideos]);
+
+  // 同步状态管理
+  const sync = useSync(handleSyncComplete);
+
+  // 初始化
+  useEffect(() => {
+    const init = async () => {
+      try {
+        const health = await checkHealth();
+        setBackendOk(true);
+        setAuthExists(health.auth_exists);
+        await loadVideos();
+      } catch {
+        setBackendOk(false);
+      } finally {
+        setLoading(false);
+      }
+    };
+    init();
+  }, [loadVideos]);
+
+  // 加载中状态
+  if (loading) {
+    return (
       <Layout>
-        <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/library" element={<Library />} />
-          <Route path="/video/:id" element={<VideoDetail />} />
-          <Route path="/settings" element={<Settings />} />
-        </Routes>
+        <div className="flex justify-center items-center h-64">
+          <div className="text-gray-500">加载中...</div>
+        </div>
       </Layout>
-    </BrowserRouter>
+    );
+  }
+
+  // 后端未启动
+  if (backendOk === false) {
+    return (
+      <Layout>
+        <div className="flex justify-center items-center h-64">
+          <div className="bg-white rounded-lg shadow-sm border border-red-200 p-8 max-w-md text-center">
+            <h1 className="text-xl font-bold text-red-600 mb-4">
+              ⚠️ 后端服务未启动
+            </h1>
+            <p className="text-gray-600 mb-6">
+              请先运行 start.bat 启动服务，或手动启动后端：
+            </p>
+            <code className="block bg-gray-100 rounded-md p-3 text-sm text-gray-800">
+              cd backend && python -m uvicorn app.main:app --reload --port 8000
+            </code>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
+
+  return (
+    <Layout>
+      {/* 标题 */}
+      <h1 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
+        🎬 抖音收藏AI知识库
+      </h1>
+
+      {/* 同步控制面板 */}
+      <SyncPanel
+        authExists={authExists}
+        syncState={sync}
+        onStart={() => sync.start(10)}
+        onStop={sync.stop}
+      />
+
+      {/* 视频列表 */}
+      <VideoTable videos={videos} />
+    </Layout>
   );
 }

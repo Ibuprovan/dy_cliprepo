@@ -1,151 +1,177 @@
+# backend/app/services/sync_service.py
+"""
+同步任务服务
+负责任务的启动、取消、状态查询
+"""
+
 import asyncio
-import uuid
+import logging
+import sys
 from datetime import datetime
-from typing import Optional, Callable
+from typing import Dict, Optional
 
-from app.database.sqlite_manager import db_manager
-from app.database.chroma_manager import chroma_manager
-from app.ai.summarizer import AIProcessor
-from app.scraper.douyin_scraper import scraper
-from app.scraper.auth_manager import auth_manager
+from app.core.config import LOGS_DIR
+from app.models.video import VideoCreate
+from app.repositories import task_repo, video_repo
+from app.scraper.auth_manager import AuthFileNotFoundError, AuthError
+from app.scraper.sync_engine import fetch_favorites_list, SyncError
 
+logger = logging.getLogger(__name__)
 
-class SyncTask:
-    def __init__(self, task_id: str):
-        self.task_id = task_id
-        self.status = "running"
-        self.progress = 0
-        self.total = 0
-        self.processed = 0
-        self.current_title = ""
-        self.error: Optional[str] = None
+# 当前运行的任务引用
+_current_task: Optional[asyncio.Task] = None
 
 
-class SyncService:
-    def __init__(self):
-        self.tasks: dict[str, SyncTask] = {}
-        self._running_tasks: dict[str, asyncio.Task] = {}
+async def start_sync(task_id: str, limit: int = 10) -> Dict:
+    """
+    启动同步任务
+    
+    Args:
+        task_id: 任务 ID
+        limit: 最大拉取数量
+    
+    Returns:
+        任务信息字典
+    """
+    global _current_task
 
-    async def start_sync(self, max_videos: Optional[int] = None) -> str:
-        task_id = f"sync_{uuid.uuid4().hex[:8]}"
-        task = SyncTask(task_id)
-        self.tasks[task_id] = task
+    # 检查是否有正在运行的任务
+    running = await task_repo.get_running_task()
+    if running:
+        raise RuntimeError("已有同步任务正在运行")
 
-        async_task = asyncio.create_task(self._run_sync(task, max_videos))
-        self._running_tasks[task_id] = async_task
+    # 创建任务记录
+    task = await task_repo.create_task(task_id)
 
-        return task_id
+    # 启动异步任务
+    _current_task = asyncio.create_task(_run_sync_task(task_id, limit))
 
-    async def _run_sync(self, task: SyncTask, max_videos: Optional[int]):
-        try:
-            ai_processor = AIProcessor()
+    return task
 
-            async def on_progress(data):
-                if data["type"] == "found":
-                    task.total = data["total"]
-                    task.current_title = data["current"]["title"]
 
-            new_videos = await scraper.scrape_favorites(
-                max_count=max_videos,
-                on_progress=on_progress,
-            )
+async def cancel_sync(task_id: str) -> bool:
+    """
+    取消同步任务
+    
+    Args:
+        task_id: 任务 ID
+    
+    Returns:
+        是否成功取消
+    """
+    global _current_task
 
-            task.total = len(new_videos)
-
-            for i, video_data in enumerate(new_videos):
-                if task.status == "stopped":
-                    break
-
-                existing = db_manager.get_video_by_url(video_data["url"])
-                if existing:
-                    task.processed = i + 1
-                    continue
-
-                task.current_title = video_data["title"]
-                task.progress = int((i + 1) / len(new_videos) * 100)
-
-                try:
-                    ai_result = await ai_processor.process_video(
-                        title=video_data["title"],
-                        desc=video_data.get("desc", ""),
-                        author=video_data.get("author", ""),
-                    )
-                except Exception as e:
-                    ai_result = {
-                        "summary": f"AI处理失败: {str(e)}",
-                        "category": "其他",
-                        "tags": [],
-                        "key_points": [],
-                        "quality_score": 1,
-                    }
-
-                video_record = {
-                    "url": video_data["url"],
-                    "title": video_data["title"],
-                    "author": video_data.get("author", ""),
-                    "author_id": video_data.get("author_id", ""),
-                    "desc": video_data.get("desc", ""),
-                    "cover_path": video_data.get("cover_url", ""),
-                    "summary": ai_result["summary"],
-                    "category": ai_result["category"],
-                    "tags": ai_result["tags"],
-                    "key_points": ai_result["key_points"],
-                    "quality_score": ai_result["quality_score"],
-                    "synced_at": datetime.utcnow(),
-                }
-
-                saved = db_manager.add_video(video_record)
-
-                doc_text = f"{video_data['title']}. {ai_result['summary']}. 标签：{', '.join(ai_result['tags'])}"
-                chroma_manager.add_embedding(
-                    video_id=saved.id,
-                    document=doc_text,
-                    metadata={
-                        "category": ai_result["category"],
-                        "url": video_data["url"],
-                    },
-                )
-
-                task.processed = i + 1
-                await asyncio.sleep(0.1)
-
-            task.status = "completed"
-            task.progress = 100
-
-            await scraper.save_cookies()
-            await scraper.stop()
-
-        except Exception as e:
-            task.status = "failed"
-            task.error = str(e)
-        finally:
-            if task.task_id in self._running_tasks:
-                del self._running_tasks[task.task_id]
-
-    def get_task(self, task_id: str) -> Optional[SyncTask]:
-        return self.tasks.get(task_id)
-
-    async def stop_sync(self, task_id: str) -> bool:
-        task = self.tasks.get(task_id)
-        if task and task.status == "running":
-            task.status = "stopped"
-            if task_id in self._running_tasks:
-                self._running_tasks[task_id].cancel()
-            return True
+    task = await task_repo.get_task(task_id)
+    if not task or task["status"] != "running":
         return False
 
-    async def manual_login(self) -> dict:
-        return await scraper.manual_login()
+    # 取消 asyncio 任务
+    if _current_task and not _current_task.done():
+        _current_task.cancel()
+        try:
+            await _current_task
+        except asyncio.CancelledError:
+            pass
 
-    async def confirm_login(self) -> dict:
-        return await scraper.confirm_login()
+    # 更新任务状态
+    await task_repo.update_task(
+        task_id,
+        status="cancelled",
+        finished_at=datetime.now().isoformat(),
+    )
 
-    async def check_login_status(self) -> dict:
-        is_logged_in = auth_manager.is_logged_in()
-        return {
-            "logged_in": is_logged_in,
-            "message": "已登录" if is_logged_in else "未登录，请先扫码登录",
-        }
+    _current_task = None
+    return True
 
 
-sync_service = SyncService()
+async def get_task_status(task_id: str) -> Optional[Dict]:
+    """获取任务状态"""
+    return await task_repo.get_task(task_id)
+
+
+async def get_running_task() -> Optional[Dict]:
+    """获取当前运行的任务"""
+    return await task_repo.get_running_task()
+
+
+async def _run_sync_task(task_id: str, limit: int):
+    """
+    执行同步任务的实际逻辑
+    
+    Args:
+        task_id: 任务 ID
+        limit: 最大拉取数量
+    """
+    try:
+        logger.info(f"开始同步任务 {task_id}，限制数量: {limit}")
+
+        # 调用爬虫获取视频
+        new_videos = await fetch_favorites_list(limit=limit)
+
+        if new_videos:
+            # 获取已存在的 URL 集合（用于去重）
+            existing_urls = await video_repo.get_existing_urls()
+
+            videos_saved = 0
+            for video_data in new_videos:
+                if video_data["url"] not in existing_urls:
+                    # 创建视频记录
+                    video = VideoCreate(
+                        url=video_data["url"],
+                        title=video_data.get("title", ""),
+                        author=video_data.get("author", ""),
+                        desc=video_data.get("desc", ""),
+                        summary=f"[AI总结] {video_data.get('title', '')} - {video_data.get('desc', '')[:50]}",
+                        category="未分类",
+                        tags=[],
+                        scraped_at=video_data.get("scraped_at", datetime.now().isoformat()),
+                    )
+                    await video_repo.create_video(video)
+                    existing_urls.add(video_data["url"])
+                    videos_saved += 1
+
+                    # 更新进度
+                    await task_repo.update_task(
+                        task_id,
+                        progress=min(99, int(videos_saved / limit * 100)),
+                        current_title=video_data.get("title", ""),
+                    )
+
+        # 标记任务完成
+        await task_repo.complete_task(task_id)
+        logger.info(f"同步任务 {task_id} 完成")
+
+    except AuthFileNotFoundError as e:
+        error_msg = f"登录态文件不存在: {e}"
+        logger.error(error_msg)
+        await task_repo.fail_task(task_id, error_msg)
+
+    except AuthError as e:
+        error_msg = f"登录态错误: {e}"
+        logger.error(error_msg)
+        await task_repo.fail_task(task_id, error_msg)
+
+    except SyncError as e:
+        error_msg = f"同步错误: {e}"
+        logger.error(error_msg)
+        await task_repo.fail_task(task_id, error_msg)
+
+    except asyncio.CancelledError:
+        logger.info(f"同步任务 {task_id} 被取消")
+        raise
+
+    except Exception as e:
+        import traceback
+        error_msg = f"未知错误: {type(e).__name__}: {e}"
+        logger.error(error_msg, exc_info=True)
+        await task_repo.fail_task(task_id, error_msg)
+
+        # 写入错误日志文件
+        log_file = LOGS_DIR / "sync_error.log"
+        with open(log_file, "a", encoding="utf-8") as f:
+            f.write(f"\n{'='*60}\n")
+            f.write(f"时间: {datetime.now().isoformat()}\n")
+            f.write(f"任务ID: {task_id}\n")
+            f.write(f"错误: {type(e).__name__}: {e}\n")
+            f.write(traceback.format_exc())
+            f.write(f"{'='*60}\n")

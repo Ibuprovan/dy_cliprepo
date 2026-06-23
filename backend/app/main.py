@@ -1,3 +1,9 @@
+# backend/app/main.py
+"""
+抖音收藏AI知识库 - FastAPI主入口
+MVP版本：最小可用Demo
+"""
+
 import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
@@ -5,64 +11,73 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
-from app.config import settings
-from app.database.models import Base, engine
+from app.core.config import ensure_dirs, FRONTEND_DIST_DIR
+from app.api.v1 import router as api_router
+from app.scraper.sync_engine import setup_sync_logger
+from app.db.database import init_db, close_db
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    Base.metadata.create_all(bind=engine)
-    os.makedirs(settings.AUTH_DIR, exist_ok=True)
-    os.makedirs(settings.CHROMADB_PATH, exist_ok=True)
+    """应用生命周期管理"""
+    # 启动时执行
+    ensure_dirs()
+    setup_sync_logger()
+    await init_db()
     yield
+    # 关闭时执行
+    await close_db()
 
 
+# 创建FastAPI应用
 app = FastAPI(
-    title="抖音收藏 AI 知识库",
-    description="抖音收藏视频的智能总结、分类与语义搜索",
-    version="1.0.0",
+    title="抖音收藏AI知识库",
+    description="抖音收藏视频的智能总结与展示",
+    version="1.0.0-mvp",
     lifespan=lifespan,
 )
 
+# CORS配置
+# 为什么需要：前端开发服务器(5173)和后端(8000)端口不同
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:3000"],
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:3000",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-from app.api.auth import router as auth_router
-from app.api.sync import router as sync_router
-from app.api.videos import router as videos_router
-from app.api.search import router as search_router
-from app.api.stats import router as stats_router
-
-app.include_router(auth_router)
-app.include_router(sync_router)
-app.include_router(videos_router)
-app.include_router(search_router)
-app.include_router(stats_router)
+# 注册API路由
+app.include_router(api_router)
 
 
 @app.get("/")
 async def root():
-    return {"message": "抖音收藏 AI 知识库 API", "version": "1.0.0"}
-
-
-@app.get("/health")
-async def health():
-    return {"status": "ok"}
+    """根路径"""
+    return {
+        "name": "抖音收藏AI知识库",
+        "version": "1.0.0-mvp",
+        "docs": "/docs",
+    }
 
 
 # 静态文件挂载（生产模式）
-frontend_dist = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "frontend", "dist")
-if os.path.exists(frontend_dist):
-    app.mount("/assets", StaticFiles(directory=os.path.join(frontend_dist, "assets")), name="assets")
+# 为什么检查目录是否存在：开发模式下前端目录可能不存在
+if FRONTEND_DIST_DIR.exists():
+    app.mount(
+        "/assets",
+        StaticFiles(directory=os.path.join(FRONTEND_DIST_DIR, "assets")),
+        name="assets",
+    )
 
     @app.get("/{full_path:path}")
     async def serve_spa(full_path: str):
-        file_path = os.path.join(frontend_dist, full_path)
+        """SPA路由"""
+        file_path = os.path.join(FRONTEND_DIST_DIR, full_path)
         if os.path.isfile(file_path):
             return FileResponse(file_path)
-        return FileResponse(os.path.join(frontend_dist, "index.html"))
+        return FileResponse(os.path.join(FRONTEND_DIST_DIR, "index.html"))
