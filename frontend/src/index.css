@@ -1,15 +1,9 @@
 /**
  * 抖音收藏AI知识库 - 全局样式
- * 使用 Tailwind CSS
+ * 使用 Tailwind CSS v4（内置 Preflight reset，修复 #11）
  */
 
 @import "tailwindcss";
-
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
 
 body {
   font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;

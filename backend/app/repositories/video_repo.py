@@ -12,6 +12,20 @@ import aiosqlite
 from app.db.database import get_db
 from app.models.video import VideoCreate, VideoDB
 
+# 列名白名单，防止 SQL 注入（修复 #1）
+ALLOWED_COLUMNS = {
+    "title", "author", "desc", "summary", "category",
+    "tags", "key_points", "quality_score", "cover_url", "cover_path",
+}
+
+
+def _safe_json_loads(s: str, default=None):
+    """安全的 JSON 解析，防止脏数据导致崩溃（修复 #6）"""
+    try:
+        return json.loads(s) if s else (default if default is not None else [])
+    except (json.JSONDecodeError, TypeError):
+        return default if default is not None else []
+
 
 async def create_video(video: VideoCreate) -> VideoDB:
     """
@@ -127,6 +141,7 @@ async def update_video(video_id: int, **kwargs) -> Optional[VideoDB]:
     """
     更新视频信息
     只更新传入的字段
+    使用列名白名单防止 SQL 注入（修复 #1）
     """
     db = await get_db()
 
@@ -134,6 +149,8 @@ async def update_video(video_id: int, **kwargs) -> Optional[VideoDB]:
     updates = []
     params = []
     for key, value in kwargs.items():
+        if key not in ALLOWED_COLUMNS:
+            continue  # 忽略非法列名，防止 SQL 注入
         if key in ("tags", "key_points"):
             value = json.dumps(value, ensure_ascii=False)
         updates.append(f"{key} = ?")
@@ -170,7 +187,7 @@ async def get_categories() -> List[str]:
 
 
 def _row_to_video(row: aiosqlite.Row) -> VideoDB:
-    """将数据库行转换为 VideoDB 对象"""
+    """将数据库行转换为 VideoDB 对象（使用安全 JSON 解析，修复 #6）"""
     return VideoDB(
         id=row["id"],
         url=row["url"],
@@ -180,8 +197,8 @@ def _row_to_video(row: aiosqlite.Row) -> VideoDB:
         desc=row["desc"],
         summary=row["summary"],
         category=row["category"],
-        tags=json.loads(row["tags"]),
-        key_points=json.loads(row["key_points"]),
+        tags=_safe_json_loads(row["tags"], []),
+        key_points=_safe_json_loads(row["key_points"], []),
         quality_score=row["quality_score"],
         cover_url=row["cover_url"],
         cover_path=row["cover_path"],

@@ -11,6 +11,9 @@ import aiosqlite
 
 from app.db.database import get_db
 
+# 列名白名单，防止 SQL 注入（修复 #3）
+ALLOWED_TASK_COLUMNS = {"status", "progress", "current_title", "error", "finished_at"}
+
 
 async def init_task_table():
     """创建任务状态表"""
@@ -69,13 +72,15 @@ async def get_running_task() -> Optional[Dict]:
 
 
 async def update_task(task_id: str, **kwargs) -> Optional[Dict]:
-    """更新任务状态"""
+    """更新任务状态（使用列名白名单防止 SQL 注入，修复 #3）"""
     db = await get_db()
 
     # 构建更新语句
     updates = []
     params = []
     for key, value in kwargs.items():
+        if key not in ALLOWED_TASK_COLUMNS:
+            raise ValueError(f"非法列名: {key}")
         updates.append(f"{key} = ?")
         params.append(value)
 

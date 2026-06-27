@@ -5,9 +5,8 @@
 
 from fastapi import APIRouter, HTTPException
 
-from app.models.video import VideoListResponse, VideoResponse
+from app.models.video import VideoListResponse, VideoResponse, VideoUpdate
 from app.repositories import video_repo
-from app.services.video_service import generate_summary
 
 router = APIRouter()
 
@@ -40,9 +39,10 @@ async def get_video(video_id: int):
 
 
 @router.put("/api/videos/{video_id}")
-async def update_video(video_id: int, updates: dict):
-    """更新视频信息"""
-    video = await video_repo.update_video(video_id, **updates)
+async def update_video(video_id: int, updates: VideoUpdate):
+    """更新视频信息（使用 VideoUpdate 模型做白名单校验，修复 #1）"""
+    update_dict = updates.model_dump(exclude_unset=True)
+    video = await video_repo.update_video(video_id, **update_dict)
     if not video:
         raise HTTPException(status_code=404, detail="视频不存在")
     return VideoResponse.model_validate(video)

@@ -55,8 +55,10 @@ export function useSync(onComplete?: () => void) {
         message: '同步任务已启动',
       }));
 
-      // 创建 SSE 连接
-      const eventSource = createSyncSSE(result.task_id, (data: unknown) => {
+      // 创建 SSE 连接（修复 #7: 增加断连回调）
+      const eventSource = createSyncSSE(
+        result.task_id,
+        (data: unknown) => {
         const taskData = data as {
           type?: string;
           status: string;
@@ -65,14 +67,24 @@ export function useSync(onComplete?: () => void) {
           error: string | null;
         };
 
-        // 处理完成消息
+        // 处理完成消息（修复 #9: 正确映射 cancelled 状态）
         if (taskData.type === 'done') {
-          const newStatus = taskData.status === 'completed' ? 'completed' : 'failed';
+          const statusMap: Record<string, SyncState['status']> = {
+            'completed': 'completed',
+            'failed': 'failed',
+            'cancelled': 'cancelled',
+          };
+          const newStatus = statusMap[taskData.status] || 'failed';
+          const messageMap: Record<string, string> = {
+            'completed': '同步完成！',
+            'failed': '同步失败',
+            'cancelled': '同步已停止',
+          };
           setState(prev => ({
             ...prev,
             status: newStatus,
             progress: 100,
-            message: taskData.status === 'completed' ? '同步完成！' : `同步${taskData.status}`,
+            message: messageMap[taskData.status] || `同步${taskData.status}`,
           }));
           cleanup();
           if (onComplete) onComplete();
@@ -97,7 +109,16 @@ export function useSync(onComplete?: () => void) {
           cleanup();
           if (onComplete) onComplete();
         }
-      });
+      },
+      // 修复 #7: SSE 断连时通知用户
+      () => {
+        setState(prev => ({
+          ...prev,
+          status: 'failed',
+          message: '连接中断，请重试',
+        }));
+      }
+      );
 
       eventSourceRef.current = eventSource;
     } catch (e: unknown) {

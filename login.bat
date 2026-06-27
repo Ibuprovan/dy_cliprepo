@@ -58,7 +58,7 @@ echo   A browser will open, scan QR code.
 echo ========================================
 echo.
 
-python -m app.scraper.auth
+python login_manual.py
 if errorlevel 1 (
     echo.
     echo [ERROR] Login script failed!

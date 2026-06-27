@@ -7,6 +7,8 @@ import asyncio
 import json
 import uuid
 
+from typing import Optional
+
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 
@@ -15,7 +17,7 @@ from app.services import sync_service
 
 router = APIRouter()
 
-SSE_TIMEOUT_SECONDS = 300  # 5 分钟超时
+SSE_TIMEOUT_SECONDS = 1800  # 30 分钟超时（修复 #10: 5 分钟对大量同步不够）
 
 
 @router.post("/api/sync/start")
@@ -49,7 +51,7 @@ async def start_sync(limit: int = 10):
 
 
 @router.post("/api/sync/stop")
-async def stop_sync(task_id: str = None):
+async def stop_sync(task_id: Optional[str] = None):
     """停止同步任务"""
     if not task_id:
         # 查找当前运行的任务

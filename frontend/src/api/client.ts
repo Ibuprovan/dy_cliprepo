@@ -60,8 +60,12 @@ export async function stopSync(taskId?: string) {
   );
 }
 
-// 创建 SSE 连接
-export function createSyncSSE(taskId: string, onMessage: (data: unknown) => void) {
+// 创建 SSE 连接（修复 #7: 增加 onError 回调）
+export function createSyncSSE(
+  taskId: string,
+  onMessage: (data: unknown) => void,
+  onError?: () => void
+) {
   const eventSource = new EventSource(`/api/sync/status/${taskId}`);
 
   eventSource.onmessage = (event) => {
@@ -75,6 +79,7 @@ export function createSyncSSE(taskId: string, onMessage: (data: unknown) => void
 
   eventSource.onerror = () => {
     eventSource.close();
+    onError?.();  // 通知调用方连接断开
   };
 
   return eventSource;

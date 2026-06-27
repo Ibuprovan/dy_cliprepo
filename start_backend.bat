@@ -20,6 +20,6 @@ echo 启动后端服务 (端口 8000)...
 echo 按 Ctrl+C 停止
 echo.
 
-python -m uvicorn app.main:app --reload --port 8000
+python run_server.py
 
 pause

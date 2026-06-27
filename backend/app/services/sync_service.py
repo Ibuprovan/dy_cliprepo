@@ -2,11 +2,16 @@
 """
 同步任务服务
 负责任务的启动、取消、状态查询
+
+关键设计：同步任务在独立线程中运行，避免 uvicorn 事件循环与 Playwright 子进程冲突。
+ProactorEventLoopPolicy 只在主线程设置一次不够，uvicorn reload 后的 worker 进程会丢失。
+独立线程 + 独立事件循环 = 可靠运行。
 """
 
 import asyncio
 import logging
 import sys
+import threading
 from datetime import datetime
 from typing import Dict, Optional
 
@@ -18,22 +23,16 @@ from app.scraper.sync_engine import fetch_favorites_list, SyncError
 
 logger = logging.getLogger(__name__)
 
-# 当前运行的任务引用
-_current_task: Optional[asyncio.Task] = None
+# 当前运行的线程引用
+_current_thread: Optional[threading.Thread] = None
+_stop_event = threading.Event()
 
 
 async def start_sync(task_id: str, limit: int = 10) -> Dict:
     """
-    启动同步任务
-    
-    Args:
-        task_id: 任务 ID
-        limit: 最大拉取数量
-    
-    Returns:
-        任务信息字典
+    启动同步任务（在独立线程中运行）
     """
-    global _current_task
+    global _current_thread, _stop_event
 
     # 检查是否有正在运行的任务
     running = await task_repo.get_running_task()
@@ -43,35 +42,52 @@ async def start_sync(task_id: str, limit: int = 10) -> Dict:
     # 创建任务记录
     task = await task_repo.create_task(task_id)
 
-    # 启动异步任务
-    _current_task = asyncio.create_task(_run_sync_task(task_id, limit))
+    # 重置停止信号
+    _stop_event.clear()
+
+    # 在独立线程中启动同步任务
+    _current_thread = threading.Thread(
+        target=_run_sync_in_thread,
+        args=(task_id, limit),
+        daemon=True,
+    )
+    _current_thread.start()
 
     return task
+
+
+def _run_sync_in_thread(task_id: str, limit: int):
+    """
+    在独立线程中运行同步任务
+    创建独立的事件循环，避免与 uvicorn 事件循环冲突
+    """
+    # 在线程中设置事件循环策略
+    if sys.platform == "win32":
+        asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+
+    try:
+        loop.run_until_complete(_run_sync_task(task_id, limit))
+    except Exception as e:
+        logger.error(f"线程中同步任务异常: {e}", exc_info=True)
+    finally:
+        loop.close()
 
 
 async def cancel_sync(task_id: str) -> bool:
     """
     取消同步任务
-    
-    Args:
-        task_id: 任务 ID
-    
-    Returns:
-        是否成功取消
     """
-    global _current_task
+    global _current_thread, _stop_event
 
     task = await task_repo.get_task(task_id)
     if not task or task["status"] != "running":
         return False
 
-    # 取消 asyncio 任务
-    if _current_task and not _current_task.done():
-        _current_task.cancel()
-        try:
-            await _current_task
-        except asyncio.CancelledError:
-            pass
+    # 设置停止信号
+    _stop_event.set()
 
     # 更新任务状态
     await task_repo.update_task(
@@ -80,7 +96,7 @@ async def cancel_sync(task_id: str) -> bool:
         finished_at=datetime.now().isoformat(),
     )
 
-    _current_task = None
+    _current_thread = None
     return True
 
 
@@ -97,10 +113,6 @@ async def get_running_task() -> Optional[Dict]:
 async def _run_sync_task(task_id: str, limit: int):
     """
     执行同步任务的实际逻辑
-    
-    Args:
-        task_id: 任务 ID
-        limit: 最大拉取数量
     """
     try:
         logger.info(f"开始同步任务 {task_id}，限制数量: {limit}")
@@ -114,6 +126,11 @@ async def _run_sync_task(task_id: str, limit: int):
 
             videos_saved = 0
             for video_data in new_videos:
+                # 检查是否需要停止
+                if _stop_event.is_set():
+                    logger.info(f"同步任务 {task_id} 收到停止信号")
+                    break
+
                 if video_data["url"] not in existing_urls:
                     # 创建视频记录
                     video = VideoCreate(
@@ -168,10 +185,18 @@ async def _run_sync_task(task_id: str, limit: int):
 
         # 写入错误日志文件
         log_file = LOGS_DIR / "sync_error.log"
-        with open(log_file, "a", encoding="utf-8") as f:
-            f.write(f"\n{'='*60}\n")
-            f.write(f"时间: {datetime.now().isoformat()}\n")
-            f.write(f"任务ID: {task_id}\n")
-            f.write(f"错误: {type(e).__name__}: {e}\n")
-            f.write(traceback.format_exc())
-            f.write(f"{'='*60}\n")
+        log_content = (
+            f"\n{'='*60}\n"
+            f"时间: {datetime.now().isoformat()}\n"
+            f"任务ID: {task_id}\n"
+            f"错误: {type(e).__name__}: {e}\n"
+            f"{traceback.format_exc()}"
+            f"{'='*60}\n"
+        )
+        await asyncio.to_thread(_write_log, log_file, log_content)
+
+
+def _write_log(log_file, content):
+    """同步写入日志文件的辅助函数"""
+    with open(log_file, "a", encoding="utf-8") as f:
+        f.write(content)

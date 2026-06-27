@@ -19,15 +19,23 @@ async def get_db() -> aiosqlite.Connection:
     """
     获取数据库连接（单例模式）
     为什么用单例：避免频繁创建/关闭连接，提高性能
+    包含健康检查，连接失效时自动重连（修复 #17）
     """
     global _db_connection
-    if _db_connection is None:
-        _db_connection = await aiosqlite.connect(str(DB_FILE))
-        _db_connection.row_factory = aiosqlite.Row
-        # 启用 WAL 模式，提高并发读写性能
-        await _db_connection.execute("PRAGMA journal_mode=WAL")
-        # 启用外键约束
-        await _db_connection.execute("PRAGMA foreign_keys=ON")
+    if _db_connection is not None:
+        try:
+            await _db_connection.execute("SELECT 1")
+            return _db_connection
+        except Exception:
+            # 连接已失效，重新创建
+            _db_connection = None
+
+    _db_connection = await aiosqlite.connect(str(DB_FILE))
+    _db_connection.row_factory = aiosqlite.Row
+    # 启用 WAL 模式，提高并发读写性能
+    await _db_connection.execute("PRAGMA journal_mode=WAL")
+    # 启用外键约束
+    await _db_connection.execute("PRAGMA foreign_keys=ON")
     return _db_connection
 
 

@@ -22,8 +22,8 @@ export default function App() {
     try {
       const data = await getVideos();
       setVideos(data.items as Video[]);
-    } catch {
-      // 忽略错误
+    } catch (e) {
+      console.error('加载视频失败:', e);  // 修复 #8: 不再静默吞掉错误
     }
   }, []);
 
@@ -76,7 +76,7 @@ export default function App() {
               请先运行 start.bat 启动服务，或手动启动后端：
             </p>
             <code className="block bg-gray-100 rounded-md p-3 text-sm text-gray-800">
-              cd backend && python -m uvicorn app.main:app --reload --port 8000
+              cd backend && python run_server.py
             </code>
           </div>
         </div>
