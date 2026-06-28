@@ -29,10 +29,11 @@ export default function App() {
     }
   }, []);
 
-  // 分类切换回调
+  // 分类切换回调（"全部"归一化为空串，避免把 category=全部 发给后端）
   const handleCategoryChange = useCallback((cat: string) => {
-    setSelectedCategory(cat);
-    loadVideos(cat || undefined);
+    const effectiveCat = cat === '全部' ? '' : cat;
+    setSelectedCategory(effectiveCat);
+    loadVideos(effectiveCat || undefined);
   }, [loadVideos]);
 
   // 同步完成回调
@@ -129,7 +130,11 @@ export default function App() {
         categories={['全部', ...categories]}
         selectedCategory={selectedCategory}
         onCategoryChange={handleCategoryChange}
-        onVideosChange={() => loadVideos(selectedCategory || undefined)}
+        onVideosChange={() => {
+          loadVideos(selectedCategory || undefined);
+          // 删除后刷新分类列表（某分类下最后一个视频被删时移除空分类）
+          getCategories().then(data => setCategories(data.categories)).catch(() => {});
+        }}
       />
     </Layout>
   );
