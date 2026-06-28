@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.2.0] - 2026-06-28
+
+### Added
+- **GLM-4.6V-Flash 多模态模型** — 从纯文本 `glm-4.7-flash` 升级到支持视频理解的 `glm-4.6v-flash`
+- **视频详情页抓取** — 同步时逐个打开视频详情页，提取完整简介和视频源地址（`sync_engine.extract_video_page_info`）
+- **AI 双路由策略** — 描述 >= 50 字走 TEXT 模式，不足但有视频源走 VL 模式（`ai_service.generate_summary_and_category`）
+- **增强同步流程** — `fetch_favorites_enriched` 复用浏览器会话，一次性完成列表抓取+详情页提取
+
+### Changed
+- **模型默认值** — `config.py` `ZHIPUAI_MODEL` 默认从 `glm-4.7-flash` 改为 `glm-4.6v-flash`
+- **API 超时** — VL 模式 120s，TEXT 模式 30s（`ai_service.py`）
+- **系统提示词** — 从"根据视频标题推测内容"改为"总结视频内容"，兼容两种模式
+- **AGENTS.md** — 更新架构说明、同步流程、新增 AI 模型章节
+- **selectors.py** — 新增 `VIDEO_DESC_DETAIL_SELECTORS` 和 `VIDEO_SOURCE_SELECTORS`
+
 ## [1.1.0] - 2026-06-28
 
 ### Fixed

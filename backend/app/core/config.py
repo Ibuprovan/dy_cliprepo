@@ -81,7 +81,7 @@ FRONTEND_URL = "http://localhost:5173"
 # 智谱 AI / GLM-4-Flash
 ZHIPUAI_API_KEY = os.getenv("ZHIPUAI_API_KEY", "")
 ZHIPUAI_BASE_URL = os.getenv("ZHIPUAI_BASE_URL", "https://open.bigmodel.cn/api/paas/v4")
-ZHIPUAI_MODEL = os.getenv("ZHIPUAI_MODEL", "glm-4.7-flash")
+ZHIPUAI_MODEL = os.getenv("ZHIPUAI_MODEL", "glm-4.6v-flash")
 ZHIPUAI_CHAT_URL = f"{ZHIPUAI_BASE_URL}/chat/completions"
 
 # ==================== 浏览器配置 ====================
@@ -120,6 +120,15 @@ MAX_SYNC_LIMIT = 500
 # 页面滚动等待时间（秒）
 SCROLL_WAIT_MIN = 1.5
 SCROLL_WAIT_MAX = 3.0
+
+# 视频详情页加载超时（毫秒）
+VIDEO_PAGE_TIMEOUT = 30000
+
+# 视频页JS渲染等待时间（秒）
+VIDEO_PAGE_RENDER_WAIT = 2.0
+
+# GLM-4.6V-Flash 的 thinking 默认启用
+VL_ENABLE_THINKING = True
 
 
 def ensure_dirs():

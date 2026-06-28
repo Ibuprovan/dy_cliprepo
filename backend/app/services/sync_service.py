@@ -19,7 +19,7 @@ from app.core.config import LOGS_DIR
 from app.models.video import VideoCreate
 from app.repositories import task_repo, video_repo
 from app.scraper.auth_manager import AuthFileNotFoundError, AuthError
-from app.scraper.sync_engine import fetch_favorites_list, SyncError
+from app.scraper.sync_engine import fetch_favorites_enriched, SyncError
 from app.services.ai_service import generate_summary_and_category
 
 logger = logging.getLogger(__name__)
@@ -118,8 +118,8 @@ async def _run_sync_task(task_id: str, limit: int):
     try:
         logger.info(f"开始同步任务 {task_id}，限制数量: {limit}")
 
-        # 调用爬虫获取视频
-        new_videos = await fetch_favorites_list(limit=limit)
+        # 调用爬虫获取视频（增强版：包含详情页描述和视频源）
+        new_videos = await fetch_favorites_enriched(limit=limit)
 
         if new_videos:
             # 获取已存在的 URL 集合（用于去重）
@@ -135,7 +135,12 @@ async def _run_sync_task(task_id: str, limit: int):
                 if video_data["url"] not in existing_urls:
                     title = video_data.get("title", "")
                     desc = video_data.get("desc", "")
-                    summary, category = await generate_summary_and_category(title, desc)
+                    video_url = video_data.get("video_src_url", "")
+                    summary, category = await generate_summary_and_category(
+                        title=title,
+                        desc=desc,
+                        video_url=video_url,
+                    )
 
                     video = VideoCreate(
                         url=video_data["url"],

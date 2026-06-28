@@ -42,6 +42,22 @@ VIDEO_COVER_SELECTORS = [
     '[class*="cover"] img',
 ]
 
+# ==================== 视频详情页 ====================
+# 详情页描述文本（通常更完整）
+VIDEO_DESC_DETAIL_SELECTORS = [
+    '[class*="desc"]',
+    '[class*="title"]',
+    'span[class*="desc"]',
+    '[data-e2e*="desc"]',
+    '[class*="video-info"]',
+]
+
+# 视频源地址（video 标签内的 src）
+VIDEO_SOURCE_SELECTORS = [
+    'video[src]',
+    'video source[src]',
+]
+
 # ==================== 收藏页面 ====================
 # 收藏标签按钮
 FAVORITE_TAB_SELECTORS = [

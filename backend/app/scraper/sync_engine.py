@@ -24,6 +24,8 @@ from app.core.config import (
     STEALTH_JS,
     SCROLL_WAIT_MIN,
     SCROLL_WAIT_MAX,
+    VIDEO_PAGE_TIMEOUT,
+    VIDEO_PAGE_RENDER_WAIT,
 )
 from app.scraper.auth_manager import (
     AuthFileNotFoundError,
@@ -37,6 +39,8 @@ from app.scraper.selectors import (
     VIDEO_DESC_SELECTORS,
     VIDEO_COVER_SELECTORS,
     FAVORITE_TAB_SELECTORS,
+    VIDEO_DESC_DETAIL_SELECTORS,
+    VIDEO_SOURCE_SELECTORS,
 )
 
 # 配置日志
@@ -158,6 +162,39 @@ async def _extract_video_info(item) -> Optional[Dict]:
     except Exception as e:
         logger.warning(f"提取视频信息失败: {e}")
         return None
+
+
+async def extract_video_page_info(page: Page, url: str) -> Dict:
+    """
+    打开视频详情页，提取完整描述和视频源地址
+    """
+    try:
+        await page.goto(url, wait_until="domcontentloaded", timeout=VIDEO_PAGE_TIMEOUT)
+        await asyncio.sleep(VIDEO_PAGE_RENDER_WAIT)
+
+        full_desc = ""
+        for selector in VIDEO_DESC_DETAIL_SELECTORS:
+            el = await page.query_selector(selector)
+            if el:
+                full_desc = await el.inner_text()
+                if full_desc.strip():
+                    break
+
+        video_src_url = ""
+        for selector in VIDEO_SOURCE_SELECTORS:
+            el = await page.query_selector(selector)
+            if el:
+                video_src_url = await el.get_attribute("src")
+                if video_src_url:
+                    break
+
+        return {
+            "desc": full_desc.strip(),
+            "video_src_url": video_src_url.strip(),
+        }
+    except Exception as e:
+        logger.warning(f"提取视频详情页信息失败 {url}: {e}")
+        return {"desc": "", "video_src_url": ""}
 
 
 async def _navigate_to_favorites(page: Page) -> bool:
@@ -336,3 +373,113 @@ async def fetch_favorites_list(
     async for video in fetch_favorites(limit, existing_urls):
         videos.append(video)
     return videos
+
+
+async def fetch_favorites_enriched(
+    limit: int = 10,
+    existing_urls: Optional[Set[str]] = None,
+) -> List[Dict]:
+    """
+    增强版同步：拉取收藏列表 + 对每个新视频打开详情页获取完整描述和视频源
+
+    适用场景：AI 总结需要更丰富的视频内容（完整 desc 或视频源 URL）。
+    为什么不在 fetch_favorites 里直接做：保持向后兼容，不改变基础拉取行为。
+    """
+    if existing_urls is None:
+        existing_urls = set()
+
+    logger.info(f"开始增强同步（含详情页），数量限制: {limit}")
+
+    if not AUTH_FILE.exists():
+        raise AuthFileNotFoundError(
+            f"登录态文件不存在: {AUTH_FILE}\n"
+            "请先运行 login_manual.py 完成登录"
+        )
+
+    async with async_playwright() as p:
+        browser = None
+        try:
+            browser = await p.chromium.launch(
+                headless=True,
+                args=BROWSER_ARGS,
+            )
+
+            context = await load_auth_context(browser)
+            page = await context.new_page()
+
+            if not await _navigate_to_favorites(page):
+                raise SyncError("无法进入收藏页面，登录态可能已失效")
+
+            seen_urls = set(existing_urls)
+            found_count = 0
+            no_new_count = 0
+            enriched = []
+
+            while found_count < limit:
+                await asyncio.sleep(2)
+
+                items = []
+                for selector in VIDEO_LIST_SELECTORS:
+                    items = await page.query_selector_all(selector)
+                    if items:
+                        break
+
+                new_this_round = 0
+
+                for item in items:
+                    if found_count >= limit:
+                        break
+
+                    video_info = await _extract_video_info(item)
+                    if not video_info:
+                        continue
+
+                    url = video_info["url"]
+                    if url in seen_urls:
+                        continue
+
+                    seen_urls.add(url)
+                    found_count += 1
+                    new_this_round += 1
+
+                    # 打开详情页获取完整描述和视频源
+                    detail_page = await context.new_page()
+                    try:
+                        extra = await extract_video_page_info(detail_page, url)
+                        if extra["desc"]:
+                            video_info["desc"] = extra["desc"]
+                        video_info["video_src_url"] = extra["video_src_url"]
+                    finally:
+                        await detail_page.close()
+
+                    logger.info(
+                        f"视频 [{found_count}/{limit}]: {video_info['title']} "
+                        f"| desc_len={len(video_info['desc'])} "
+                        f"| has_video={'yes' if video_info['video_src_url'] else 'no'}"
+                    )
+                    enriched.append(video_info)
+
+                if new_this_round == 0:
+                    no_new_count += 1
+                    if no_new_count >= 3:
+                        logger.info("连续3次没有新视频，停止滚动")
+                        break
+                else:
+                    no_new_count = 0
+
+                scroll_distance = random.randint(600, 1000)
+                await page.evaluate(f"window.scrollBy(0, {scroll_distance})")
+                wait_time = random.uniform(SCROLL_WAIT_MIN, SCROLL_WAIT_MAX)
+                await asyncio.sleep(wait_time)
+
+            logger.info(f"增强同步完成，共 {len(enriched)} 个视频")
+            return enriched
+
+        except (AuthFileNotFoundError, AuthError):
+            raise
+        except Exception as e:
+            logger.error(f"增强同步过程出错: {e}", exc_info=True)
+            raise SyncError(f"同步失败: {e}")
+        finally:
+            if browser:
+                await browser.close()

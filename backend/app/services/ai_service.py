@@ -1,5 +1,5 @@
 import logging
-from typing import Tuple
+from typing import Tuple, Union
 
 import httpx
 
@@ -13,9 +13,9 @@ CATEGORIES = [
 ]
 
 SYSTEM_PROMPT = (
-    "你是一个抖音视频分析助手。根据视频标题推测内容，写一段有用的中文总结。\n"
+    "你是一个抖音视频分析助手。总结视频内容，写一段有用的中文总结。\n"
     "要求：\n"
-    "1. 总结必须基于视频标题推测实际内容，禁止重复标题\n"
+    "1. 总结必须基于实际内容，禁止重复标题\n"
     "2. 100-200字，结构清晰，包含内容概述、要点和价值\n"
     "3. 最后从以下分类中选择最匹配的："
     + "、".join(CATEGORIES) +
@@ -23,14 +23,36 @@ SYSTEM_PROMPT = (
 )
 
 
-async def generate_summary_and_category(title: str, desc: str) -> Tuple[str, str]:
+async def generate_summary_and_category(
+    title: str,
+    desc: str = "",
+    video_url: str = "",
+) -> Tuple[str, str]:
     if not ZHIPUAI_API_KEY:
         return _fallback_summary(title, desc), "未分类"
 
-    user_content = f"标题：{title}\n描述：{desc}" if desc else f"标题：{title}"
+    # 双路由决策：有视频源且描述不足50字时走VL，否则走文本
+    use_vl = bool(video_url and len(desc.strip()) < 50)
+
+    if use_vl:
+        user_content: Union[str, list] = [
+            {"type": "video_url", "video_url": {"url": video_url}},
+            {"type": "text", "text": (
+                f"视频标题：{title}\n\n"
+                "根据这个视频的画面和内容写一段中文总结，100-200字。"
+            )},
+        ]
+        api_timeout = 120
+        api_max_tokens = 4096
+        mode_tag = "VL"
+    else:
+        user_content = f"标题：{title}\n描述：{desc}" if desc else f"标题：{title}"
+        api_timeout = 30
+        api_max_tokens = 2048
+        mode_tag = "TEXT"
 
     try:
-        async with httpx.AsyncClient(timeout=30) as client:
+        async with httpx.AsyncClient(timeout=api_timeout) as client:
             response = await client.post(
                 ZHIPUAI_CHAT_URL,
                 headers={
@@ -44,7 +66,7 @@ async def generate_summary_and_category(title: str, desc: str) -> Tuple[str, str
                         {"role": "user", "content": user_content},
                     ],
                     "temperature": 0.7,
-                    "max_tokens": 2048,
+                    "max_tokens": api_max_tokens,
                 },
             )
             response.raise_for_status()
@@ -55,15 +77,15 @@ async def generate_summary_and_category(title: str, desc: str) -> Tuple[str, str
                 or message.get("reasoning_content", "").strip()
             )
             summary, category = _parse_response(raw)
-            logger.info(f"摘要 {len(summary)}字 | 分类 {category}")
+            logger.info(f"[{mode_tag}] 摘要 {len(summary)}字 | 分类 {category}")
             return summary, category
 
     except httpx.TimeoutException:
-        logger.error("GLM-4-Flash API 请求超时")
+        logger.error(f"GLM-4.6V-Flash API 请求超时 ({mode_tag})")
     except httpx.HTTPStatusError as e:
-        logger.error(f"GLM-4-Flash API 返回错误: {e.response.status_code}")
+        logger.error(f"GLM-4.6V-Flash API 返回错误: {e.response.status_code} ({mode_tag})")
     except Exception as e:
-        logger.error(f"GLM-4-Flash API 调用失败: {e}")
+        logger.error(f"GLM-4.6V-Flash API 调用失败: {e} ({mode_tag})")
 
     return _fallback_summary(title, desc), "未分类"
 
@@ -129,8 +151,8 @@ def _match_category(text: str) -> str:
     return "其他"
 
 
-async def generate_summary(title: str, desc: str) -> str:
-    summary, _ = await generate_summary_and_category(title, desc)
+async def generate_summary(title: str, desc: str = "", video_url: str = "") -> str:
+    summary, _ = await generate_summary_and_category(title, desc, video_url)
     return summary
 
 

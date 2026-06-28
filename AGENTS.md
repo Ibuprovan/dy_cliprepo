@@ -71,7 +71,7 @@ backend/app/
 
 启动链路：`main.py` lifespan → `ensure_dirs()` → `setup_sync_logger()` → `init_db()`。
 
-同步流程：API `/api/sync/start` → `sync_service.start_sync()` → `asyncio.create_task` → `_run_sync_task` → `sync_engine.fetch_favorites_list()` → Playwright 无头模式 → selectors 提取数据 → 存入 SQLite。
+同步流程：API `/api/sync/start` → `sync_service.start_sync()` → `threading.Thread` → `_run_sync_task` → `sync_engine.fetch_favorites_enriched()` → Playwright 无头模式 → 收藏列表 + 逐个打开视频详情页提取完整描述和视频源 → AI 双路由（text 模式或 VL 模式）→ 存入 SQLite。
 
 ## 数据存储
 
@@ -89,6 +89,14 @@ SQLite 数据库：`backend/data/app.db`（WAL 模式，启用外键）。登录
 ## 前端
 
 单页 React 应用（`frontend/src/App.tsx`），使用 Tailwind CSS v4 + Vite 代理。不用 axios，用原生 `fetch`。`/api` 和 `/health` 请求在开发时代理到 `localhost:8000`。
+
+## AI 模型
+
+- **默认模型**：`glm-4.6v-flash`（智谱免费多模态模型，支持文本+视频理解）
+- **双路由策略**：视频详情页描述 >= 50 字 → TEXT 模式（上传描述文本）；描述不足但有视频源 → VL 模式（上传视频 URL 分析）
+- **推理模型输出**：`content` 字段为空，输出在 `reasoning_content`。`ai_service.py` 的 `_extract_summary()` 从推理文本中提取最终总结段落
+- **限流处理**：免费模型有频率限制（429），`generate_summary_and_category` 内部自动退化到描述截取 fallback
+- **旧模型**：之前使用 `glm-4.7-flash`，现已统一迁移到 `glm-4.6v-flash`
 
 ## 注意事项
 
