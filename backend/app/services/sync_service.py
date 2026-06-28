@@ -20,6 +20,7 @@ from app.models.video import VideoCreate
 from app.repositories import task_repo, video_repo
 from app.scraper.auth_manager import AuthFileNotFoundError, AuthError
 from app.scraper.sync_engine import fetch_favorites_list, SyncError
+from app.services.ai_service import generate_summary
 
 logger = logging.getLogger(__name__)
 
@@ -132,13 +133,16 @@ async def _run_sync_task(task_id: str, limit: int):
                     break
 
                 if video_data["url"] not in existing_urls:
-                    # 创建视频记录
+                    title = video_data.get("title", "")
+                    desc = video_data.get("desc", "")
+                    summary = await generate_summary(title, desc)
+
                     video = VideoCreate(
                         url=video_data["url"],
-                        title=video_data.get("title", ""),
+                        title=title,
                         author=video_data.get("author", ""),
-                        desc=video_data.get("desc", ""),
-                        summary=f"[AI总结] {video_data.get('title', '')} - {video_data.get('desc', '')[:50]}",
+                        desc=desc,
+                        summary=summary,
                         category="未分类",
                         tags=[],
                         scraped_at=video_data.get("scraped_at", datetime.now().isoformat()),

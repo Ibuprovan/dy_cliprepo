@@ -7,9 +7,14 @@
 import os
 from pathlib import Path
 
+from dotenv import load_dotenv
+
 # 项目根目录：backend/app/core/config.py -> backend/app/core -> backend/app -> backend -> 项目根目录
 # 为什么这样写：确保无论从哪里运行脚本，路径都是相对于项目根目录的
 BASE_DIR = Path(__file__).resolve().parent.parent.parent.parent
+
+# 加载 .env 文件
+load_dotenv(BASE_DIR / "backend" / ".env")
 
 # ==================== 目录路径 ====================
 # 后端目录
@@ -71,6 +76,13 @@ BACKEND_PORT = 8000
 
 # 前端开发服务器地址
 FRONTEND_URL = "http://localhost:5173"
+
+# ==================== AI 配置 ====================
+# 智谱 AI / GLM-4-Flash
+ZHIPUAI_API_KEY = os.getenv("ZHIPUAI_API_KEY", "")
+ZHIPUAI_BASE_URL = os.getenv("ZHIPUAI_BASE_URL", "https://open.bigmodel.cn/api/paas/v4")
+ZHIPUAI_MODEL = os.getenv("ZHIPUAI_MODEL", "glm-4.7-flash")
+ZHIPUAI_CHAT_URL = f"{ZHIPUAI_BASE_URL}/chat/completions"
 
 # ==================== 浏览器配置 ====================
 # Playwright反检测参数
