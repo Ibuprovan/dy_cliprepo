@@ -3,10 +3,17 @@
 视频相关路由
 """
 
+from typing import List
+
 from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
 
 from app.models.video import VideoListResponse, VideoResponse, VideoUpdate
 from app.repositories import video_repo
+
+
+class BatchDeleteRequest(BaseModel):
+    ids: List[int]
 
 router = APIRouter()
 
@@ -50,8 +57,17 @@ async def update_video(video_id: int, updates: VideoUpdate):
 
 @router.delete("/api/videos/{video_id}")
 async def delete_video(video_id: int):
-    """删除视频"""
+    """删除单个视频"""
     success = await video_repo.delete_video(video_id)
     if not success:
         raise HTTPException(status_code=404, detail="视频不存在")
     return {"message": "删除成功"}
+
+
+@router.post("/api/videos/delete-batch")
+async def delete_videos_batch(req: BatchDeleteRequest):
+    """批量删除视频"""
+    if not req.ids:
+        raise HTTPException(status_code=400, detail="ID 列表不能为空")
+    count = await video_repo.delete_videos(req.ids)
+    return {"message": f"成功删除 {count} 个视频", "deleted_count": count}

@@ -171,11 +171,22 @@ async def update_video(video_id: int, **kwargs) -> Optional[VideoDB]:
 
 
 async def delete_video(video_id: int) -> bool:
-    """删除视频"""
+    """删除单个视频"""
     db = await get_db()
     cursor = await db.execute("DELETE FROM videos WHERE id = ?", (video_id,))
     await db.commit()
     return cursor.rowcount > 0
+
+
+async def delete_videos(video_ids: List[int]) -> int:
+    """批量删除视频，返回删除数量"""
+    if not video_ids:
+        return 0
+    db = await get_db()
+    placeholders = ",".join("?" for _ in video_ids)
+    cursor = await db.execute(f"DELETE FROM videos WHERE id IN ({placeholders})", video_ids)
+    await db.commit()
+    return cursor.rowcount
 
 
 async def get_categories() -> List[str]:

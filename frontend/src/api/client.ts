@@ -98,7 +98,15 @@ export async function logout() {
   );
 }
 
-// 删除视频
+// 删除单个视频
 export async function deleteVideo(id: number) {
   return request<{ message: string }>(`/api/videos/${id}`, { method: 'DELETE' });
+}
+
+// 批量删除视频
+export async function deleteVideos(ids: number[]) {
+  return request<{ message: string; deleted_count: number }>(`/api/videos/delete-batch`, {
+    method: 'POST',
+    body: { ids },
+  });
 }

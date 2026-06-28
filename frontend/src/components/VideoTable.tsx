@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { deleteVideo } from '../api/client';
+import { deleteVideo, deleteVideos } from '../api/client';
 import type { Video } from '../types';
 
 interface VideoTableProps {
@@ -25,6 +25,8 @@ export function VideoTable({ videos, categories, selectedCategory, onCategoryCha
   const [imgErrors, setImgErrors] = useState<Set<number>>(new Set());
   const [expandedTitles, setExpandedTitles] = useState<Set<number>>(new Set());
   const [deleting, setDeleting] = useState<number | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [batchDeleting, setBatchDeleting] = useState(false);
 
   const toggleExpand = (id: number) => {
     setExpandedTitles((prev) => {
@@ -34,16 +36,50 @@ export function VideoTable({ videos, categories, selectedCategory, onCategoryCha
     });
   };
 
+  const allSelected = videos.length > 0 && selectedIds.size === videos.length;
+
+  const toggleSelect = (id: number) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (allSelected) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(videos.map((v) => v.id)));
+    }
+  };
+
   const handleDelete = async (video: Video) => {
     if (!confirm(`确定删除「${video.title || '无标题'}」？`)) return;
     setDeleting(video.id);
     try {
       await deleteVideo(video.id);
+      setSelectedIds((prev) => { const n = new Set(prev); n.delete(video.id); return n; });
       onVideosChange();
     } catch (e) {
       console.error('删除失败:', e);
     } finally {
       setDeleting(null);
+    }
+  };
+
+  const handleBatchDelete = async () => {
+    if (selectedIds.size === 0) return;
+    if (!confirm(`确定删除选中的 ${selectedIds.size} 个视频？此操作不可撤销。`)) return;
+    setBatchDeleting(true);
+    try {
+      await deleteVideos(Array.from(selectedIds));
+      setSelectedIds(new Set());
+      onVideosChange();
+    } catch (e) {
+      console.error('批量删除失败:', e);
+    } finally {
+      setBatchDeleting(false);
     }
   };
 
@@ -72,82 +108,128 @@ export function VideoTable({ videos, categories, selectedCategory, onCategoryCha
           暂无视频数据，请先点击"开始同步"
         </div>
       ) : (
-        <div className="grid gap-4">
-          {videos.map((video) => {
-            const isExpanded = expandedTitles.has(video.id);
-            return (
-              <div key={video.id} className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden flex flex-col sm:flex-row">
-                {/* 封面 */}
-                <div className="w-full sm:w-48 h-48 sm:h-auto bg-gray-100 flex-shrink-0">
-                  {video.cover_url && !imgErrors.has(video.id) ? (
-                    <img
-                      src={video.cover_url}
-                      alt={video.title}
-                      className="w-full h-full object-cover"
-                      referrerPolicy="no-referrer"
-                      onError={() => setImgErrors((prev) => new Set(prev).add(video.id))}
+        <div>
+          {/* 批量操作工具栏 */}
+          <div className="flex items-center gap-3 mb-3 px-1">
+            <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={allSelected}
+                onChange={toggleSelectAll}
+                className="w-4 h-4 rounded border-gray-300 text-blue-500 focus:ring-blue-400"
+              />
+              全选
+            </label>
+            {selectedIds.size > 0 && (
+              <span className="text-sm text-gray-500">已选 {selectedIds.size} 项</span>
+            )}
+            <button
+              onClick={handleBatchDelete}
+              disabled={selectedIds.size === 0 || batchDeleting}
+              className={`ml-auto text-xs px-4 py-1.5 rounded-md font-medium transition-colors ${
+                selectedIds.size > 0
+                  ? 'bg-red-500 text-white hover:bg-red-600'
+                  : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+              }`}
+            >
+              {batchDeleting ? '删除中...' : `批量删除${selectedIds.size > 0 ? ` (${selectedIds.size})` : ''}`}
+            </button>
+          </div>
+
+          {/* 视频卡片列表 */}
+          <div className="grid gap-4">
+            {videos.map((video) => {
+              const isExpanded = expandedTitles.has(video.id);
+              const isSelected = selectedIds.has(video.id);
+              return (
+                <div
+                  key={video.id}
+                  className={`bg-white rounded-lg shadow-sm border overflow-hidden flex flex-col sm:flex-row transition-colors ${
+                    isSelected ? 'border-blue-400 ring-1 ring-blue-200' : 'border-gray-200'
+                  }`}
+                >
+                  {/* 复选框 */}
+                  <div className="absolute sm:relative z-10 p-2">
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={() => toggleSelect(video.id)}
+                      className="w-4 h-4 rounded border-gray-300 text-blue-500 focus:ring-blue-400 cursor-pointer"
                     />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-gray-300 text-4xl">🎬</div>
-                  )}
-                </div>
+                  </div>
 
-                {/* 信息 */}
-                <div className="flex-1 p-5 flex flex-col justify-between min-w-0">
-                  <div>
-                    <div className="flex items-start justify-between gap-3 mb-2">
-                      <div>
-                        <h3 className={`text-base font-semibold text-gray-900 leading-snug ${isExpanded ? '' : 'line-clamp-2'}`}>
-                          <a href={video.url} target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 transition-colors">
-                            {video.title || '无标题'}
-                          </a>
-                        </h3>
-                        {video.title && video.title.length > 30 && (
-                          <button
-                            onClick={() => toggleExpand(video.id)}
-                            className="text-xs text-blue-500 hover:text-blue-700 mt-0.5"
-                          >
-                            {isExpanded ? '收起' : '展开全部'}
-                          </button>
-                        )}
-                      </div>
-                      <span className="text-xs text-gray-400 whitespace-nowrap shrink-0">{video.author || ''}</span>
-                    </div>
-
-                    {video.summary && (
-                      <p className="text-sm text-gray-600 leading-relaxed mb-3">{video.summary}</p>
+                  {/* 封面 */}
+                  <div className="w-full sm:w-48 h-48 sm:h-auto bg-gray-100 flex-shrink-0">
+                    {video.cover_url && !imgErrors.has(video.id) ? (
+                      <img
+                        src={video.cover_url}
+                        alt={video.title}
+                        className="w-full h-full object-cover"
+                        referrerPolicy="no-referrer"
+                        onError={() => setImgErrors((prev) => new Set(prev).add(video.id))}
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-gray-300 text-4xl">🎬</div>
                     )}
                   </div>
 
-                  {/* 操作按钮 */}
-                  <div className="flex items-center gap-2 mt-2">
-                    <button
-                      onClick={() => downloadMarkdown(video)}
-                      disabled={!video.summary}
-                      className="text-xs px-3 py-1.5 rounded-md bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                    >
-                      下载 Markdown
-                    </button>
-                    <a
-                      href={video.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-xs px-3 py-1.5 rounded-md bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
-                    >
-                      打开原视频
-                    </a>
-                    <button
-                      onClick={() => handleDelete(video)}
-                      disabled={deleting === video.id}
-                      className="text-xs px-3 py-1.5 rounded-md bg-red-50 text-red-500 hover:bg-red-100 disabled:opacity-40 transition-colors ml-auto"
-                    >
-                      {deleting === video.id ? '删除中...' : '删除'}
-                    </button>
+                  {/* 信息 */}
+                  <div className="flex-1 p-5 flex flex-col justify-between min-w-0">
+                    <div>
+                      <div className="flex items-start justify-between gap-3 mb-2">
+                        <div>
+                          <h3 className={`text-base font-semibold text-gray-900 leading-snug ${isExpanded ? '' : 'line-clamp-2'}`}>
+                            <a href={video.url} target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 transition-colors">
+                              {video.title || '无标题'}
+                            </a>
+                          </h3>
+                          {video.title && video.title.length > 30 && (
+                            <button
+                              onClick={() => toggleExpand(video.id)}
+                              className="text-xs text-blue-500 hover:text-blue-700 mt-0.5"
+                            >
+                              {isExpanded ? '收起' : '展开全部'}
+                            </button>
+                          )}
+                        </div>
+                        <span className="text-xs text-gray-400 whitespace-nowrap shrink-0">{video.author || ''}</span>
+                      </div>
+
+                      {video.summary && (
+                        <p className="text-sm text-gray-600 leading-relaxed mb-3">{video.summary}</p>
+                      )}
+                    </div>
+
+                    {/* 操作按钮 */}
+                    <div className="flex items-center gap-2 mt-2">
+                      <button
+                        onClick={() => downloadMarkdown(video)}
+                        disabled={!video.summary}
+                        className="text-xs px-3 py-1.5 rounded-md bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                      >
+                        下载 Markdown
+                      </button>
+                      <a
+                        href={video.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs px-3 py-1.5 rounded-md bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
+                      >
+                        打开原视频
+                      </a>
+                      <button
+                        onClick={() => handleDelete(video)}
+                        disabled={deleting === video.id}
+                        className="text-xs px-3 py-1.5 rounded-md bg-red-50 text-red-500 hover:bg-red-100 disabled:opacity-40 transition-colors ml-auto"
+                      >
+                        {deleting === video.id ? '删除中...' : '删除'}
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
       )}
     </div>
