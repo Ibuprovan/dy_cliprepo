@@ -43,9 +43,16 @@ export function useSync(onComplete?: () => void) {
 
   // 启动同步
   const start = useCallback(async (limit = 10) => {
-    try {
-      setState(prev => ({ ...prev, message: '正在启动同步...', error: null }));
+    // 防止重复调用：先清理旧 SSE 连接
+    cleanup();
 
+    // 防止在 await 期间重复触发
+    setState(prev => {
+      if (prev.status === 'running') return prev;
+      return { ...prev, message: '正在启动同步...', error: null };
+    });
+
+    try {
       const result = await startSync(limit);
 
       setState(prev => ({
@@ -55,7 +62,7 @@ export function useSync(onComplete?: () => void) {
         message: '同步任务已启动',
       }));
 
-      // 创建 SSE 连接（修复 #7: 增加断连回调）
+      // 创建 SSE 连接
       const eventSource = createSyncSSE(
         result.task_id,
         (data: unknown) => {
@@ -67,7 +74,7 @@ export function useSync(onComplete?: () => void) {
           error: string | null;
         };
 
-        // 处理完成消息（修复 #9: 正确映射 cancelled 状态）
+        // 处理完成消息
         if (taskData.type === 'done') {
           const statusMap: Record<string, SyncState['status']> = {
             'completed': 'completed',
@@ -94,8 +101,8 @@ export function useSync(onComplete?: () => void) {
         // 更新状态
         setState(prev => ({
           ...prev,
-          progress: taskData.progress,
-          currentTitle: taskData.current_title,
+          progress: taskData.progress ?? 0,
+          currentTitle: taskData.current_title || '',
           error: taskData.error,
         }));
 
@@ -110,7 +117,6 @@ export function useSync(onComplete?: () => void) {
           if (onComplete) onComplete();
         }
       },
-      // 修复 #7: SSE 断连时通知用户
       () => {
         setState(prev => ({
           ...prev,
@@ -120,6 +126,8 @@ export function useSync(onComplete?: () => void) {
       }
       );
 
+      // 再次清理以防在 await 期间有其他调用创建了连接
+      cleanup();
       eventSourceRef.current = eventSource;
     } catch (e: unknown) {
       const error = e as Error;

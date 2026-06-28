@@ -70,8 +70,8 @@ DOUYIN_HOME_URL = "https://www.douyin.com"
 # 抖音个人主页（用于验证登录态）
 DOUYIN_USER_URL = "https://www.douyin.com/user/self"
 
-# 后端服务地址
-BACKEND_HOST = "0.0.0.0"
+# 后端服务地址（绑定 127.0.0.1，避免局域网未授权访问）
+BACKEND_HOST = "127.0.0.1"
 BACKEND_PORT = 8000
 
 # 前端开发服务器地址

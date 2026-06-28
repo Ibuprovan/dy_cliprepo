@@ -116,6 +116,18 @@ async def fail_task(task_id: str, error: str) -> Optional[Dict]:
     )
 
 
+async def cleanup_zombie_tasks():
+    """启动时清理上次崩溃遗留的僵尸 running 任务"""
+    db = await get_db()
+    await db.execute(
+        "UPDATE sync_tasks SET status = 'failed', "
+        "error = '服务重启时中断', finished_at = ? "
+        "WHERE status = 'running'",
+        (datetime.now().isoformat(),),
+    )
+    await db.commit()
+
+
 async def get_recent_tasks(limit: int = 10) -> List[Dict]:
     """获取最近的任务记录"""
     db = await get_db()

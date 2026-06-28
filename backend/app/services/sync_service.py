@@ -121,15 +121,19 @@ async def _run_sync_task(task_id: str, limit: int):
         # 调用爬虫获取视频（增强版：包含详情页描述和视频源）
         new_videos = await fetch_favorites_enriched(limit=limit)
 
+        was_cancelled = False
+
         if new_videos:
             # 获取已存在的 URL 集合（用于去重）
             existing_urls = await video_repo.get_existing_urls()
 
             videos_saved = 0
+            total_to_process = max(len(new_videos), 1)  # 防止除零
             for video_data in new_videos:
                 # 检查是否需要停止
                 if _stop_event.is_set():
                     logger.info(f"同步任务 {task_id} 收到停止信号")
+                    was_cancelled = True
                     break
 
                 if video_data["url"] not in existing_urls:
@@ -157,41 +161,45 @@ async def _run_sync_task(task_id: str, limit: int):
                     existing_urls.add(video_data["url"])
                     videos_saved += 1
 
-                    # 更新进度
+                    # 更新进度（用实际视频数而非 limit，避免全重复时进度卡 0%）
                     await task_repo.update_task(
                         task_id,
-                        progress=min(99, int(videos_saved / limit * 100)),
+                        progress=min(99, int(videos_saved / total_to_process * 100)),
                         current_title=video_data.get("title", ""),
                     )
 
-        # 标记任务完成
-        await task_repo.complete_task(task_id)
-        logger.info(f"同步任务 {task_id} 完成")
+        # 根据取消标记决定最终状态
+        if was_cancelled:
+            logger.info(f"同步任务 {task_id} 已取消")
+        else:
+            await task_repo.complete_task(task_id)
+            logger.info(f"同步任务 {task_id} 完成")
 
     except AuthFileNotFoundError as e:
         error_msg = f"登录态文件不存在: {e}"
         logger.error(error_msg)
-        await task_repo.fail_task(task_id, error_msg)
+        await _safe_fail_task(task_id, error_msg)
 
     except AuthError as e:
         error_msg = f"登录态错误: {e}"
         logger.error(error_msg)
-        await task_repo.fail_task(task_id, error_msg)
+        await _safe_fail_task(task_id, error_msg)
 
     except SyncError as e:
         error_msg = f"同步错误: {e}"
         logger.error(error_msg)
-        await task_repo.fail_task(task_id, error_msg)
+        await _safe_fail_task(task_id, error_msg)
 
     except asyncio.CancelledError:
         logger.info(f"同步任务 {task_id} 被取消")
+        await _safe_fail_task(task_id, "任务被取消")
         raise
 
     except Exception as e:
         import traceback
         error_msg = f"未知错误: {type(e).__name__}: {e}"
         logger.error(error_msg, exc_info=True)
-        await task_repo.fail_task(task_id, error_msg)
+        await _safe_fail_task(task_id, error_msg)
 
         # 写入错误日志文件
         log_file = LOGS_DIR / "sync_error.log"
@@ -204,6 +212,14 @@ async def _run_sync_task(task_id: str, limit: int):
             f"{'='*60}\n"
         )
         await asyncio.to_thread(_write_log, log_file, log_content)
+
+
+async def _safe_fail_task(task_id: str, error: str):
+    """安全标记任务失败，即使 fail_task 自身异常也不卡 running"""
+    try:
+        await task_repo.fail_task(task_id, error)
+    except Exception as e:
+        logger.error(f"fail_task 也失败了: {e}，任务 {task_id} 可能卡在 running")
 
 
 def _write_log(log_file, content):

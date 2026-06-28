@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { deleteVideo, deleteVideos } from '../api/client';
 import type { Video } from '../types';
 
@@ -17,8 +17,12 @@ function downloadMarkdown(video: Video) {
   const a = document.createElement('a');
   a.href = url;
   a.download = `${video.title.replace(/[/\\?%*:|"<>]/g, '_')}.md`;
+  // Firefox 需要挂载到 DOM 才能 click 触发下载
+  document.body.appendChild(a);
   a.click();
-  URL.revokeObjectURL(url);
+  document.body.removeChild(a);
+  // 延迟 revoke，避免浏览器下载未启动就释放
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 export function VideoTable({ videos, categories, selectedCategory, onCategoryChange, onVideosChange }: VideoTableProps) {
@@ -28,6 +32,13 @@ export function VideoTable({ videos, categories, selectedCategory, onCategoryCha
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [batchDeleting, setBatchDeleting] = useState(false);
 
+  // videos 变化时清理过期状态（切换分类、删除、同步后）
+  useEffect(() => {
+    setSelectedIds(new Set());
+    setImgErrors(new Set());
+    setExpandedTitles(new Set());
+  }, [videos]);
+
   const toggleExpand = (id: number) => {
     setExpandedTitles((prev) => {
       const next = new Set(prev);
@@ -36,7 +47,7 @@ export function VideoTable({ videos, categories, selectedCategory, onCategoryCha
     });
   };
 
-  const allSelected = videos.length > 0 && selectedIds.size === videos.length;
+  const allSelected = videos.length > 0 && videos.every(v => selectedIds.has(v.id));
 
   const toggleSelect = (id: number) => {
     setSelectedIds((prev) => {
@@ -144,7 +155,7 @@ export function VideoTable({ videos, categories, selectedCategory, onCategoryCha
               return (
                 <div
                   key={video.id}
-                  className={`bg-white rounded-lg shadow-sm border overflow-hidden flex flex-col sm:flex-row transition-colors ${
+                  className={`relative bg-white rounded-lg shadow-sm border overflow-hidden flex flex-col sm:flex-row transition-colors ${
                     isSelected ? 'border-blue-400 ring-1 ring-blue-200' : 'border-gray-200'
                   }`}
                 >

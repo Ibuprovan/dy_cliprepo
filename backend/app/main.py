@@ -19,6 +19,7 @@ from app.core.logger import setup_debug_logging
 from app.api.v1 import router as api_router
 from app.scraper.sync_engine import setup_sync_logger
 from app.db.database import init_db, close_db
+from app.repositories import task_repo
 
 # 修复 #12: 在 main.py 中也设置事件循环策略，作为热重载保险
 if sys.platform == "win32":
@@ -33,6 +34,8 @@ async def lifespan(app: FastAPI):
     setup_debug_logging()
     setup_sync_logger()
     await init_db()
+    # 清理上次崩溃遗留的僵尸 running 任务
+    await task_repo.cleanup_zombie_tasks()
     yield
     # 关闭时执行
     await close_db()

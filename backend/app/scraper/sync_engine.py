@@ -484,14 +484,19 @@ async def fetch_favorites_enriched(
                     new_this_round += 1
 
                     # 打开详情页获取完整描述和视频源
-                    detail_page = await context.new_page()
+                    # 单个详情页失败不应中止整条同步
                     try:
-                        extra = await extract_video_page_info(detail_page, url)
-                        if extra["desc"]:
-                            video_info["desc"] = extra["desc"]
-                        video_info["video_src_url"] = extra["video_src_url"]
-                    finally:
-                        await detail_page.close()
+                        detail_page = await context.new_page()
+                        try:
+                            extra = await extract_video_page_info(detail_page, url)
+                            if extra["desc"]:
+                                video_info["desc"] = extra["desc"]
+                            video_info["video_src_url"] = extra["video_src_url"]
+                        finally:
+                            await detail_page.close()
+                    except Exception as e:
+                        logger.warning(f"详情页抓取失败，跳过增强: {url} | {e}")
+                        video_info["video_src_url"] = ""
 
                     logger.info(
                         f"视频 [{found_count}/{limit}]: {video_info['title']} "

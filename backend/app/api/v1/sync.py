@@ -38,8 +38,10 @@ async def start_sync(limit: int = 0):
             detail="已有同步任务正在运行，请等待完成"
         )
 
-    # limit=0 表示全部，用 MAX_SYNC_LIMIT 兜底
+    # limit=0 表示全部，用 MAX_SYNC_LIMIT 兜底；同时钳制上限
     if limit <= 0:
+        limit = MAX_SYNC_LIMIT
+    elif limit > MAX_SYNC_LIMIT:
         limit = MAX_SYNC_LIMIT
 
     task_id = f"sync_{uuid.uuid4().hex[:8]}"
@@ -82,7 +84,15 @@ async def sync_status(task_id: str):
     async def event_generator():
         elapsed = 0.0
         while elapsed < SSE_TIMEOUT_SECONDS:
-            task = await sync_service.get_task_status(task_id)
+            try:
+                task = await sync_service.get_task_status(task_id)
+            except Exception as e:
+                # DB 异常时推送错误事件而非静默中断
+                err_data = {"task_id": task_id, "status": "failed", "error": f"状态查询失败: {e}"}
+                yield f"data: {json.dumps(err_data, ensure_ascii=False)}\n\n"
+                yield f"data: {json.dumps({'type': 'done', 'status': 'failed'})}\n\n"
+                break
+
             if not task:
                 break
 
