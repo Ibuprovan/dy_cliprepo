@@ -129,7 +129,7 @@ async def _extract_video_info(item) -> Optional[Dict]:
         for selector in VIDEO_COVER_SELECTORS:
             cover_el = await item.query_selector(selector)
             if cover_el:
-                src = await cover_el.get_attribute("src")
+                src = await cover_el.get_attribute("data-src") or await cover_el.get_attribute("src")
                 if src:
                     cover_url = src.strip()
                     break

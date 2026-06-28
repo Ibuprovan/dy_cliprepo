@@ -129,6 +129,7 @@ export default function App() {
         categories={['全部', ...categories]}
         selectedCategory={selectedCategory}
         onCategoryChange={handleCategoryChange}
+        onVideosChange={() => loadVideos(selectedCategory || undefined)}
       />
     </Layout>
   );

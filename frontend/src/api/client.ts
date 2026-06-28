@@ -97,3 +97,8 @@ export async function logout() {
     { method: 'POST' }
   );
 }
+
+// 删除视频
+export async function deleteVideo(id: number) {
+  return request<{ message: string }>(`/api/videos/${id}`, { method: 'DELETE' });
+}
