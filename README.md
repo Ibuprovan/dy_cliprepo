@@ -1,360 +1,379 @@
-# 抖音收藏 AI 知识库 (Douyin Knowledge Base)
+# 抖音收藏 AI 知识库
 
-> 让你的抖音收藏夹从吃灰的仓库，变成可检索、可分类、可复用的个人知识资产。
+> 让你的抖音收藏夹从吃灰的仓库，变成可沉淀、可检索的个人知识资产。
 
-![版本徽章](https://img.shields.io/badge/version-1.0.0-blue.svg)
-![许可证徽章](https://img.shields.io/badge/license-MIT-green.svg)
-![Python版本](https://img.shields.io/badge/python-3.11+-yellow.svg)
-![Node版本](https://img.shields.io/badge/node-18+-lightgreen.svg)
+[![Python](https://img.shields.io/badge/python-3.11+-yellow.svg)](https://www.python.org/)
+[![Node](https://img.shields.io/badge/node-18+-lightgreen.svg)](https://nodejs.org/)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-## 项目简介
+---
 
-这是一个专为重度抖音用户设计的本地私有化知识管理工具。它通过浏览器自动化技术抓取你的抖音收藏视频，利用 AI 对视频内容进行智能总结、自动分类和标签提取，最终构建成一个支持语义搜索的结构化知识库。
+## 关于这个项目
 
-所有数据存储在本地，无需担心隐私泄露，也无需依赖抖音官方 API。
+写这个工具的初衷很简单：我收藏了大量抖音视频，但收藏 ≠ 学会，时间久了根本找不到、想不起来。
 
-**核心理念：「收藏不等于拥有，检索才能创造价值。」**
+我的设想是：**把抖音收藏夹当成一个"稍后看"的书签池"，定期把有价值的内容以 Markdown 的形式沉淀到自己的知识库（Obsidian、Notion、Logseq 等），真正把收藏变成自己的知识。**
 
-## 功能特性
+然而，由于本人只是一名学生，**个人电脑算力不足以支撑 AI 模型实时分析视频内容**（无论是本地部署视觉语言模型还是云端视频理解 API，费用和延迟都是问题）。因此，当前的 AI 总结主要基于视频标题和文字描述，视频内容的深度理解尚未实现。
 
-| 能力 | 说明 |
+**这个项目目前处于"可用但不完善"的状态，作者暂无精力继续维护。** 如果你觉得有用，欢迎基于此项目继续开发；如果愿意分享改进，也非常欢迎提交 Pull Request。
+
+---
+
+## 功能说明
+
+| 功能 | 说明 |
 |------|------|
-| 🔄 一键同步 | 自动登录抖音网页版，抓取收藏列表，支持断点续传和增量更新 |
-| 🤖 AI 智能总结 | 基于大语言模型（支持本地 Ollama / 云端 API）自动生成视频核心要点、干货评分 |
-| 📁 自动分类体系 | 将杂乱的收藏自动归类到「编程技术 / 商业思维 / 生活技巧 / 心理学」等知识维度 |
-| 🔍 语义搜索引擎 | 不是简单的关键词匹配——输入"如何提高专注力"，能搜到相关的心理学和学习方法视频 |
-| 🔒 私有化部署 | 前后端完全本地运行，视频数据、AI 处理、向量数据库均不出境 |
-| 📊 现代化看板 | React 驱动的可视化界面，支持分类浏览、时间轴、标签云和质量筛选 |
+| **抖音收藏同步** | 通过 Playwright 自动登录，抓取全部收藏视频（含封面、作者、描述、收藏时间） |
+| **AI 智能总结** | 基于视频标题和文字描述生成摘要，自动分类到知识维度（编程/商业/生活/心理学等） |
+| **单条 Markdown 导出** | 在视频卡片上直接导出单条 Markdown，方便复制到知识库 |
+| **分类浏览与筛选** | 按分类、时间、收藏状态筛选，支持批量删除 |
+| **实时同步进度** | SSE 实时推送同步进度，随时了解抓取状态 |
 
-## 技术架构
+### 当前局限性（诚实说明）
 
-### 技术栈
+- AI 总结依赖视频的**文字描述**，无法理解视频画面内容（受限于本地算力和免费 API 的视频理解能力）
+- 不支持**语义搜索**（embedding 需要额外部署向量数据库）
+- 登录态约 7 天后需要重新扫码（抖音官方机制）
 
-| 层级 | 技术 | 说明 |
-|------|------|------|
-| **前端** | React 19 + TypeScript + Tailwind CSS | 现代化UI框架，响应式设计 |
-| **后端** | Python FastAPI | 异步高性能，天然支持 SSE（实时推送同步进度） |
-| **数据库** | SQLite + ChromaDB | 结构化存储 + 向量检索，零配置本地部署 |
-| **AI层** | Ollama / OpenAI / DeepSeek | 支持本地模型（推荐 Qwen2.5）或云端 API |
-| **自动化** | Playwright | 比 Selenium 更现代，能穿透抖音的反爬，且支持保存登录态 |
-
-### 数据流
-
-```
-Playwright 抓取 → AI 总结与向量化 → SQLite 结构化存储 + ChromaDB 语义索引 → React 可视化消费
-```
+---
 
 ## 快速开始
 
 ### 环境要求
 
-- **Python**: 3.11 或更高版本
-- **Node.js**: 18 或更高版本
-- **Git**: 用于克隆仓库
-- **操作系统**: Windows 10/11（推荐）
+- **Python** 3.11+
+- **Node.js** 18+
+- **操作系统**：Windows 10/11（已针对 Windows 做了特殊适配）
+- **网络**：能够访问抖音网页版和智谱 AI API
 
-### 方式一：一键启动（推荐）
+### 步骤一：克隆仓库
 
 ```bash
-# 1. 克隆仓库
 git clone https://github.com/Ibuprovan/dy_cliprepo.git
 cd dy_cliprepo
-
-# 2. 首次登录抖音（只需一次）
-login.bat
-
-# 3. 启动服务
-start.bat
 ```
 
-### 方式二：手动启动
+### 步骤二：安装依赖
 
-#### 后端安装
+**后端（建议先创建虚拟环境）：**
 
 ```bash
-# 1. 进入后端目录
 cd backend
 
-# 2. 创建Python虚拟环境
+# 创建虚拟环境（Windows）
 python -m venv venv
 .\venv\Scripts\activate
 
-# 3. 安装依赖
+# 安装依赖
 pip install -r requirements.txt
 
-# 4. 安装Playwright浏览器
+# 安装 Playwright 浏览器（只需一次）
 playwright install chromium
-
-# 5. 启动后端
-python -m uvicorn app.main:app --reload --port 8000
 ```
 
-#### 前端安装
+**前端：**
 
 ```bash
-# 1. 进入前端目录
 cd frontend
-
-# 2. 安装依赖
 npm install
-
-# 3. 启动前端
-npm run dev
 ```
 
-### 抖音登录
+### 步骤三：配置环境变量
 
-由于抖音需要登录才能查看收藏，需要先完成扫码登录：
+在后端目录创建 `.env` 文件（参考 `.env.example`）：
+
+```env
+# 智谱 AI API Key（免费额度：GLM-4.6V-Flash 每月 100 万 Token）
+# 申请地址：https://open.bigmodel.cn/
+ZHIPUAI_API_KEY=your_api_key_here
+```
+
+> **没有 API Key 怎么办？**
+> AI 总结功能将退化为本地关键词提取模式（不调用 API，直接基于标题和描述生成摘要），工具仍可正常使用，但总结质量会下降。
+
+### 步骤四：登录抖音
+
+必须先完成一次扫码登录，后续同步才能读取收藏夹：
 
 ```bash
-# 方式一：使用登录脚本
+# 方式一：一键脚本（推荐双击运行）
 login.bat
 
 # 方式二：手动运行
 cd backend
 .\venv\Scripts\activate
-python -m app.scraper.auth
+python login_manual.py
 ```
 
-登录成功后，登录态会保存到 `backend/data/auth.json`，后续同步会自动使用。
+运行后会弹出一个无头浏览器窗口，按照提示用抖音 App 扫码即可。登录成功后会保存登录态到 `backend/data/douyin_auth.json`，**约 7 天内无需重新登录**。
 
-### AI模型配置
-
-#### 方案A：本地Ollama（推荐，隐私最好）
+### 步骤五：启动服务
 
 ```bash
-# 1. 安装Ollama
-# 下载地址：https://ollama.ai
+# 一键启动（推荐）
+start.bat
 
-# 2. 拉取模型（中文表现好，14B 在 16G 显存可跑）
-ollama pull qwen2.5:14b
+# 或分别启动
+# 终端 1：后端
+cd backend
+.\venv\Scripts\activate
+python run_server.py
 
-# 3. 启动服务
-ollama serve
+# 终端 2：前端
+cd frontend
+npm run dev
 ```
 
-#### 方案B：云端API
+启动成功后，打开浏览器访问：
 
-在 `backend/.env` 中配置：
+- **前端界面**：http://localhost:5173
+- **后端 API 文档**：http://localhost:8000/docs
 
-```env
-# 使用 DeepSeek
-AI_PROVIDER=deepseek
-DEEPSEEK_API_KEY=your-api-key
+---
 
-# 或使用 OpenAI
-AI_PROVIDER=openai
-OPENAI_API_KEY=your-api-key
-```
-
-## 使用说明
-
-### 首次登录
-
-1. 运行 `login.bat` 或执行 `python -m app.scraper.auth`
-2. 在弹出的浏览器窗口中使用抖音APP扫码登录
-3. 登录成功后，登录态会自动保存
+## 使用指南
 
 ### 同步收藏
 
-1. 启动服务：运行 `start.bat`
-2. 打开前端：http://localhost:5173
-3. 点击"同步收藏"按钮
-4. 系统会自动抓取收藏视频并进行AI处理
-5. 通过 SSE 实时推送同步进度
+1. 打开 http://localhost:5173
+2. 在"同步收藏"输入框填入想抓取的数量（留空 = 全部），点击"开始同步"
+3. 观察实时进度条和日志，了解抓取状态
+4. 同步完成后，视频列表自动刷新
 
-### 浏览知识库
+> **同步是增量更新**：已存在的视频（按 URL 去重）会被跳过，不会重复抓取。可以放心反复同步。
 
-1. **Dashboard（控制台）**：查看统计信息、分类看板、最近同步
-2. **Library（知识库）**：浏览分类和标签，使用搜索功能
-3. **Video Detail（视频详情）**：查看AI总结、关键要点、同类推荐
+### 导出到知识库
 
-### 搜索功能
+每张视频卡片右上角有"下载 MD"按钮，点击即可导出单条 Markdown 文件，内容包含：
 
-- **普通搜索**：基于SQLite的LIKE查询，支持标题和总结内容
-- **语义搜索**：基于ChromaDB的向量检索，输入自然语言查询
-  - 示例："找关于 Python 异步编程的内容"
-  - 示例："如何提高专注力"
-- **筛选器**：按分类/标签/质量分/收藏时间筛选
+```markdown
+# 视频标题
 
-## API 文档
+> AI 摘要内容
 
-### API端点列表
+---
 
-| 方法 | 路径 | 说明 |
-|------|------|------|
-| `GET` | `/health` | 健康检查 |
-| `GET` | `/api/auth/status` | 检查登录状态 |
-| `POST` | `/api/auth/check` | 详细检查登录状态 |
-| `POST` | `/api/auth/clear` | 清除登录态 |
-| `POST` | `/api/sync/start` | 启动同步任务 |
-| `GET` | `/api/sync/status?task_id=xxx` | SSE 流，实时返回进度 |
-| `POST` | `/api/sync/stop` | 中止同步 |
-| `GET` | `/api/videos` | 分页获取视频列表 |
-| `GET` | `/api/videos/:id` | 获取单个视频详情 |
-| `PUT` | `/api/videos/:id` | 更新视频信息 |
-| `DELETE` | `/api/videos/:id` | 删除视频 |
-| `GET` | `/api/videos/categories` | 获取所有分类 |
-| `GET` | `/api/videos/tags` | 获取所有标签 |
-| `POST` | `/api/search` | 语义搜索 |
-| `GET` | `/api/search/similar/:id` | 查找相似视频 |
-| `GET` | `/api/stats` | 仪表盘统计 |
-| `GET` | `/api/stats/config` | 获取配置状态 |
-| `GET` | `/api/stats/health` | 后端健康检查 |
-
-### Swagger UI
-
-启动后端服务后，访问以下地址查看完整API文档：
-
-- **Swagger UI**: http://localhost:8000/docs
-- **ReDoc**: http://localhost:8000/redoc
-
-## 项目结构
-
-```
-dy_cliprepo/
-├── backend/                          # Python 后端
-│   ├── app/
-│   │   ├── __init__.py
-│   │   ├── main.py                   # FastAPI 入口
-│   │   ├── config.py                 # 配置管理
-│   │   ├── database/
-│   │   │   ├── models.py             # SQLAlchemy 模型
-│   │   │   ├── sqlite_manager.py     # 数据库操作
-│   │   │   └── chroma_manager.py     # 向量数据库
-│   │   ├── scraper/
-│   │   │   ├── auth.py               # 独立登录脚本
-│   │   │   └── douyin_scraper.py     # 基于 auth.json 的只读同步
-│   │   ├── ai/
-│   │   │   ├── summarizer.py         # AI 总结与分类
-│   │   │   ├── embedding.py          # 文本向量化
-│   │   │   └── prompts.py            # Prompt 模板
-│   │   ├── api/
-│   │   │   ├── auth.py               # 认证路由
-│   │   │   ├── sync.py               # 同步任务路由
-│   │   │   ├── videos.py             # 视频相关路由
-│   │   │   ├── search.py             # 搜索路由
-│   │   │   └── stats.py              # 统计路由
-│   │   └── services/
-│   │       └── sync_service.py       # 同步任务编排
-│   ├── data/                         # 数据目录
-│   │   ├── auth.json                 # 登录态文件
-│   │   ├── douyin_kb.db              # SQLite 数据库
-│   │   ├── chromadb/                 # ChromaDB 数据
-│   │   └── covers/                   # 封面图存储
-│   ├── .env                          # 环境变量
-│   ├── .env.example
-│   ├── requirements.txt
-│   └── venv/                         # Python 虚拟环境
-│
-├── frontend/                         # React 前端
-│   ├── src/
-│   │   ├── api/
-│   │   │   └── client.ts             # API 封装
-│   │   ├── components/               # 组件
-│   │   ├── pages/
-│   │   │   ├── Dashboard.tsx         # 主控制台
-│   │   │   ├── Library.tsx           # 知识库浏览
-│   │   │   ├── VideoDetail.tsx       # 视频详情
-│   │   │   └── Settings.tsx          # 设置
-│   │   ├── types/
-│   │   │   └── index.ts              # TypeScript 类型
-│   │   ├── App.tsx
-│   │   └── main.tsx
-│   ├── package.json
-│   └── vite.config.ts
-│
-├── docs/                             # 文档
-├── start.bat                         # 启动脚本
-├── login.bat                         # 登录脚本
-└── README.md
+原视频链接：https://...
 ```
 
-## 数据库 Schema
+将导出的 Markdown 文件放入 Obsidian/Notion/Logseq 的仓库目录，即完成知识沉淀。
 
-### SQLite 表结构
+**建议流程**：每天/每周固定一个时间做一次"同步 + 导出"，形成规律的知识整理习惯。
 
-```sql
-CREATE TABLE videos (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    url TEXT UNIQUE NOT NULL,
-    title TEXT,
-    author TEXT,
-    author_id TEXT,
-    desc TEXT,
-    cover_path TEXT,
-    cover_url TEXT,
-    summary TEXT,
-    category TEXT,
-    tags JSON,
-    key_points JSON,
-    quality_score INTEGER DEFAULT 0,
-    created_at DATETIME,
-    favorited_at DATETIME,
-    synced_at DATETIME,
-    updated_at DATETIME,
-    embedding_id TEXT
-);
+### 浏览与筛选
+
+- 点击顶部分类标签筛选对应类别的视频
+- 鼠标悬停视频卡片展开 AI 摘要
+- 选中多个视频后点击"批量删除"清理无效收藏
+
+### 退出登录
+
+如果需要换账号，点击右上角"退出登录"，再重新运行 `login.bat` 即可。
+
+---
+
+## 进阶用法
+
+### 每日邮件推送（进阶需求，需自行扩展）
+
+当前版本不包含自动邮件推送功能。以下是实现思路，供有能力的开发者参考：
+
+```python
+# 每日定时同步 + 导出 + 发送邮件伪代码
+# 可使用 Windows 任务计划程序 / crontab 定时运行
+
+import subprocess, smtplib, os
+from email.mime.text import MIMEText
+from datetime import datetime
+
+# 1. 运行同步脚本
+subprocess.run(["python", "test_sync.py"])
+
+# 2. 读取今日新同步的视频（通过数据库查询 favorited_at）
+new_videos = query_new_videos_since(last_run_time)
+
+# 3. 生成 Markdown 摘要
+email_body = "\n\n---\n\n".join([
+    f"## {v.title}\n\n> {v.summary}\n\n[v.link]"
+    for v in new_videos
+])
+
+# 4. 发送邮件（使用任意邮箱 SMTP）
+msg = MIMEText(email_body, "plain")
+msg["Subject"] = f"抖音收藏日报 {datetime.now().date()}"
+# smtplib.SMTP("smtp.example.com", 587).send_message(msg)
 ```
 
-### ChromaDB 集合
+### 配合 Obsidian / Notion 使用
 
-- **Collection**: `video_embeddings`
-- **Documents**: `"{title}. {summary}. 标签：{tags}"`（用于语义匹配）
-- **Metadatas**: `{"video_id": 123, "category": "编程技术", "url": "..."}`
+1. 在 Obsidian/Notion 中创建一个固定文件夹/目录作为"抖音知识库"
+2. 每次同步后，批量导出 Markdown 到该目录
+3. 利用 Obsidian/Notion 的双链和标签功能做二次整理
+
+### 定期自动同步（Windows 任务计划程序）
+
+1. 打开"任务计划程序"（`taskschd.msc`）
+2. 创建基本任务，设置触发器（如每天上午 9:00）
+3. 操作选择"启动程序"，程序填 `python`，参数填 `run_server.py`（需写完整路径）
+4. 配合 `curl` 或 Python 脚本定时调用 `POST /api/sync/start`
+
+---
 
 ## 常见问题
 
 ### Q: 登录态过期了怎么办？
 
-A: 重新运行登录脚本：
-
+重新运行登录脚本即可：
 ```bash
 login.bat
 # 或
-cd backend && python -m app.scraper.auth
+cd backend && python login_manual.py
 ```
 
-### Q: Ollama 连接失败？
+### Q: 同步时浏览器崩溃或卡住？
 
-A: 确保 Ollama 服务已启动：
+1. 按 `Ctrl+C` 中止当前进程
+2. 重启后端：`Stop-Process -Name python -Force; python run_server.py`
+3. 重新点击"开始同步"（已抓取的视频会自动跳过）
 
-```bash
-ollama serve
+### Q: 页面结构变化，视频抓不到或 AI 总结质量下降？
+
+抖音网页版会不定期更新 DOM 结构。如果发现抓取失败：
+
+1. 打开 `backend/app/scraper/selectors.py`，更新对应的 CSS 选择器
+2. 查看 `backend/app/scraper/sync_engine.py` 中的选择器调用是否需要调整
+3. 提交 PR 或 issue 帮助改进
+
+### Q: API Key 如何获取？
+
+1. 访问 [智谱 AI 开放平台](https://open.bigmodel.cn/)
+2. 注册账号并完成实名认证
+3. 在控制台创建 API Key
+4. GLM-4.6V-Flash 有免费额度（每月 100 万 Token），普通用户足够
+
+### Q: AI 总结质量很差，几乎是原文复制？
+
+- 视频描述太短（抖音描述少于 50 字）：模型难以提取足够信息，可尝试手动编辑描述
+- API 限流（429）：免费模型有频率限制，等待几分钟后重试
+- API Key 未配置或配置错误：检查 `.env` 文件
+
+### Q: 同步很慢，每次只能抓几十条？
+
+抖音页面采用无限滚动加载机制，每次抓取后会滚动页面加载更多。如果网络较慢，可以适当减少每次同步的数量（如每次 50 条），分多次完成。
+
+### Q: 能否抓取他人抖音账号的收藏？
+
+**不能。** 工具读取的是浏览器登录态对应的账号收藏夹，无法访问他人账号。
+
+### Q: 如何完全卸载？
+
+1. 停止后端和前端进程
+2. 删除项目目录
+3. 删除 `backend/data/` 目录（包含数据库和登录态）
+4. 删除 Python 虚拟环境目录 `backend/venv`
+
+---
+
+## 项目结构
+
+```
+dy_cliprepo/
+├── backend/                          # Python FastAPI 后端
+│   ├── app/
+│   │   ├── main.py                   # FastAPI 入口、CORS、lifespan
+│   │   ├── core/
+│   │   │   ├── config.py             # 所有配置（路径、API Key、浏览器参数）
+│   │   │   └── logger.py             # 环形缓冲区日志系统
+│   │   ├── api/v1/
+│   │   │   ├── videos.py             # 视频 CRUD、批量删除
+│   │   │   ├── sync.py               # 同步任务启动、停止、SSE 进度
+│   │   │   ├── auth.py               # 登录态检查与退出
+│   │   │   └── debug.py              # 调试日志查询
+│   │   ├── services/
+│   │   │   ├── sync_service.py       # 同步任务编排（独立线程）
+│   │   │   └── ai_service.py         # AI 总结与分类（智谱 GLM-4.6V-Flash）
+│   │   ├── repositories/
+│   │   │   ├── video_repo.py         # 视频数据 CRUD（参数化查询防注入）
+│   │   │   └── task_repo.py          # 同步任务状态管理
+│   │   ├── db/
+│   │   │   └── database.py           # aiosqlite 单例（SQLite WAL 模式）
+│   │   ├── scraper/
+│   │   │   ├── sync_engine.py        # Playwright 无头抓取
+│   │   │   ├── auth_manager.py       # 登录态管理
+│   │   │   └── selectors.py          # 抖音页面 CSS 选择器
+│   │   └── models/
+│   │       └── video.py              # Pydantic 数据模型
+│   ├── data/                         # 本地数据（gitignored）
+│   │   ├── app.db                   # SQLite 数据库
+│   │   └── douyin_auth.json         # Playwright 登录态（cookies + localStorage）
+│   ├── run_server.py                # Windows 启动脚本（设置事件循环策略）
+│   ├── login_manual.py               # 独立登录脚本
+│   ├── requirements.txt
+│   └── .env.example
+│
+├── frontend/                         # React + TypeScript + Tailwind v4 前端
+│   ├── src/
+│   │   ├── App.tsx                  # 主页面、状态管理
+│   │   ├── api/client.ts            # fetch 封装
+│   │   ├── components/
+│   │   │   ├── VideoTable.tsx        # 视频卡片列表、分类筛选、批量操作
+│   │   │   ├── SyncPanel.tsx        # 同步控制面板
+│   │   │   └── Layout.tsx           # 页面布局
+│   │   ├── hooks/
+│   │   │   └── useSync.ts           # SSE 连接管理
+│   │   └── types/index.ts           # TypeScript 类型定义
+│   └── package.json
+│
+├── docs/                             # 文档（可选扩展）
+├── start.bat                         # 一键启动前后端
+├── login.bat                         # 登录脚本
+├── AGENTS.md                         # 开发者维护文档
+├── CHANGELOG.md                      # 版本更新记录
+├── CODE_WIKI.md                      # 项目架构详细说明
+└── README.md
 ```
 
-### Q: 同步过程中断了怎么办？
+---
 
-A: 支持断点续传，再次点击"同步收藏"即可，会自动跳过已同步的视频。
+## 技术栈
 
-### Q: 如何切换 AI 模型？
+| 层级 | 技术 | 说明 |
+|------|------|------|
+| **前端** | React 19 + TypeScript | 组件化 UI，TypeScript 类型保障 |
+| **样式** | Tailwind CSS v4 | 原子化 CSS，通过 Vite 插件集成 |
+| **后端** | Python FastAPI | 异步高性能框架，天然支持 SSE |
+| **数据库** | SQLite（aiosqlite） | WAL 模式，零配置本地存储 |
+| **浏览器自动化** | Playwright | 比 Selenium 更现代，支持保存登录态 |
+| **AI** | 智谱 GLM-4.6V-Flash | 免费多模态模型（文字理解），视频内容理解受算力限制 |
+| **日志** | RingBufferHandler | 内存环形缓冲区，保留最近 500 条，支持查询 |
 
-A: 修改 `backend/.env` 文件中的 `AI_PROVIDER` 配置，然后重启后端。
-
-### Q: 数据存储在哪里？
-
-A: 所有数据存储在 `backend/data/` 目录：
-- `auth.json` - 登录态
-- `douyin_kb.db` - SQLite 数据库
-- `chromadb/` - 向量数据库
-- `covers/` - 封面图
-
-## 许可证
-
-本项目采用 [MIT 许可证](LICENSE) - 详见 LICENSE 文件
+---
 
 ## 免责声明
 
-- 本项目仅供个人学习使用，请勿用于商业用途
+- 本项目仅供个人学习与研究使用，请勿用于商业用途或大规模爬取
 - 请遵守抖音的使用条款和相关法律法规
-- 收藏内容可能涉及个人兴趣，请注意隐私保护
-- 建议全程本地处理，避免将数据上传到第三方
+- 收藏内容可能涉及个人隐私，请妥善保管本地数据
+- 作者不对因使用本工具造成的任何后果承担责任
 
-## 致谢
+---
 
-- [FastAPI](https://fastapi.tiangolo.com/) - 现代、快速的Python Web框架
-- [React](https://reactjs.org/) - 用于构建用户界面的JavaScript库
-- [Playwright](https://playwright.dev/) - 现代化的浏览器自动化工具
-- [ChromaDB](https://www.trychroma.com/) - 轻量级向量数据库
-- [Ollama](https://ollama.ai/) - 本地大模型运行工具
-- [Tailwind CSS](https://tailwindcss.com/) - 实用优先的CSS框架
+## 贡献与联系
+
+当前项目维护状态：**低优先级维护**
+
+如果你有意继续开发，欢迎提交 Pull Request。以下是一些可能的改进方向：
+
+- [ ] 集成本地视觉语言模型（如 Qwen2.5-VL、LLava）进行视频内容理解
+- [ ] 添加 embedding 向量搜索（ChromaDB / Qdrant）
+- [ ] 实现每日邮件定时推送
+- [ ] 支持更多平台（微博、B站、小红书）
+- [ ] 添加视频封面图缓存与展示优化
+- [ ] 国际化（多语言支持）
+
+如有问题或建议，欢迎在 GitHub 提 Issue。
+
+---
+
+*希望这个工具能帮你把收藏夹里的"知识"真正变成自己的知识。*

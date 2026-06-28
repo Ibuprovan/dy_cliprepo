@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.5.0] - 2026-06-28
+
+### Changed
+- **前端整体换肤为极简设计系统** — 应用「极简」Design Library（黑白单色调 + Geist 字体 + 精密阴影/圆角），替换原有蓝色/灰色 Tailwind 默认配色
+- **`index.css`** — 通过 `@theme` 注入完整 token 体系（brand 10 级灰阶、surface/ink 色板、状态色变体、自定义 radius/shadow）
+- **`Layout.tsx`** — 移除 `max-w-7xl` 容器，改为全宽布局无两侧空白；顶栏使用 `shadow-2xs` 极微阴影
+- **`SyncPanel.tsx`** — 标题 uppercase、主按钮 brand-900 纯黑、进度条从蓝色改黑色、状态提示使用 design system 语义色
+- **`VideoTable.tsx`** — 分类 tab 改 brand-900 黑底方角；卡片选中态用 brand-900 边框+ring；封面占位从 emoji 改 Heroicons outline SVG；删除按钮改为文字色 ghost 样式
+- **`App.tsx`** — 加载态和错误提示页适配 design system 语义色
+
 ## [1.4.0] - 2026-06-28
 
 ### Fixed
@@ -27,7 +37,10 @@
 
 ### Changed
 - **AI 路由策略调整** — 仅当 desc 完全为空才走 VL 模式，短描述统一走 TEXT 模式，避免视频 URL 不可访问导致超时
-- **AGENTS.md** — 同步提交历史 + 新增 2 条已知注意事项（后端绑定 127.0.0.1、GLM 限流重试）
+- **AGENTS.md** — 同步项目描述与架构说明，同步提交历史 + 新增 2 条已知注意事项（后端绑定 127.0.0.1、GLM 限流重试）
+
+### Docs
+- **README.md 全面重写** — 以谦虚语气说明项目定位（个人知识沉淀工具，而非完整 AI 产品），诚实说明 AI 视频理解的算力局限性，添加详细用户指引（从 GitHub 克隆到个人使用的完整步骤）、常见问题、进阶用法（邮件推送、知识库集成、定时同步）
 
 ## [1.3.0] - 2026-06-28
 

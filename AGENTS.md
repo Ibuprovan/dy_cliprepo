@@ -2,7 +2,11 @@
 
 ## 项目概述
 
-抖音收藏 AI 知识库 — 本地工具，通过 Playwright 抓取抖音收藏视频，AI 总结，语义搜索。Windows 优先。
+抖音收藏 AI 知识库 — 本地工具，通过 Playwright 抓取抖音收藏视频，AI 总结和分类，导出 Markdown 沉淀到个人知识库。Windows 优先。
+
+**定位**：将抖音收藏夹作为"稍后看"的书签池，定期导出 Markdown 到 Obsidian/Notion/Logseq 等知识管理工具，真正把收藏变成自己的知识。
+
+**维护状态**：低优先级维护（作者为学生，算力不足以支撑 AI 视频内容理解）。欢迎贡献。
 
 前后端分离：Python FastAPI 后端 (端口 8000) + React/Vite 前端 (端口 5173)。
 
@@ -112,12 +116,13 @@ SQLite 数据库：`backend/data/app.db`（WAL 模式，启用外键）。
 
 ## AI 模型
 
-- **默认模型**：`glm-4.6v-flash`（智谱免费多模态模型，支持文本+视频理解）
+- **默认模型**：`glm-4.6v-flash`（智谱免费多模态模型，支持文本理解）
+- **视频内容理解受限于算力**：免费模型无法稳定分析视频流，本工具 AI 总结主要依赖文字描述
 - **thinking 已关闭**：`thinking: {"type": "disabled"}`，输出走 `content` 字段（稳定可控），`reasoning_content` 做兜底
-- **双路由**：描述 >= 50 字 → TEXT 模式；不足但有视频源 → VL 模式
-- **max_tokens**：统一 4096
-- **限流处理**：免费模型频率限制（429），自动退化到描述截取 fallback
+- **双路由**：描述完全为空 → VL 模式尝试分析视频 URL；其他情况统一走 TEXT 模式
+- **429 限流**：免费模型触发频率限制时自动重试 3 次（间隔 2/4/6 秒），完全失败走本地智能提取 fallback
 - **摘要提取**：_extract_summary 按 `【分类：xxx】` 分割取最前，兜底到引号/段落/句子
+- **本地分类兜底**：AI 失败时基于关键词表做本地分类匹配（数学建模/装修/职场/面试/求职/婚姻/前端等）
 
 ## 调试日志系统
 
@@ -143,7 +148,7 @@ GET /api/debug/logs?n=100&level=INFO
 5. **没有自动化测试** — `backend/test_*.py` 是手动诊断脚本，不是 pytest 测试套件。没有 CI/CD。
 6. **登录过期** — Cookie 约 7 天失效，报认证错误时重新运行 `login_manual.py`
 7. **README 过时** — 描述了尚未实现的功能。以代码为准。
-8. **前端使用 Tailwind v4** — 用 `@tailwindcss/vite` 插件，不是 PostCSS 配置。样式用 Tailwind 工具类写在 JSX 中。
+8. **前端使用 Tailwind v4** — 用 `@tailwindcss/vite` 插件，不是 PostCSS 配置。样式用 Tailwind 工具类写在 JSX 中。已注入极简设计系统 token（@theme），通过 `brand-*`、`surface-*`、`ink-*` 等语义色名引用。
 9. **数据目录被 gitignore** — `backend/data/` 不在仓库中。首次运行通过 `ensure_dirs()` 自动创建
 10. **Playwright 浏览器二进制** — 不在仓库中，venv 创建后必须运行 `playwright install chromium`
 11. **后端绑定 127.0.0.1** — 本地工具只监听回环接口，不对外暴露。AGENTS.md 早期版本的 `0.0.0.0` 已修正。
@@ -170,6 +175,7 @@ GET /api/debug/logs?n=100&level=INFO
 ## 最近提交历史
 
 ```
+style: 前端整体换肤为极简设计系统（全宽布局 + 黑白单色调 token）
 feat: 重写 AI 摘要：429 重试 + 智能 fallback + 本地分类
 fix: 修复同步后点击"全部"分类无法加载视频
 fix: 15 项 bug 与安全修复（后端安全/任务状态/SSE + 前端状态管理/UI）
@@ -188,9 +194,10 @@ c791cb4 refactor: 架构优化 - 分层架构、SQLite、组件化前端
 
 > 完整更新内容见 [CHANGELOG.md](CHANGELOG.md)
 
-## 未来方向
+## 未来方向（欢迎贡献）
 
-- **VL 视频理解强化**：当前 VL 模式用 GLM-4.6V-Flash 分析视频 URL，效果取决于模型能否访问 Douyin CDN
-- **本地 VL 模型**：用户有 RTX 4060 (4GB)，可考虑 Ollama + Qwen3-VL-2B q4 量化
-- **语义搜索**：当前缺乏 embedding 和搜索
+- **VL 视频理解强化**：集成本地视觉语言模型（Qwen2.5-VL、LLava 等）进行视频画面理解
+- **语义搜索**：添加 embedding 向量搜索（ChromaDB / Qdrant）
+- **每日邮件定时推送**：定时同步 + Markdown 汇总 + SMTP 发送到常用邮箱
+- **知识库集成**：Obsidian/Notion/Logseq 插件或一键导入
 - **统计面板**：分类分布图、同步历史等
