@@ -1,5 +1,34 @@
 # Changelog
 
+## [1.4.0] - 2026-06-28
+
+### Fixed
+- **AI 摘要质量差（大量原文截取/未分类）** — `ai_service` 重写：新增 429/超时自动重试 3 次（间隔 2/4/6s），智能 fallback 摘要（清理 hashtag + 按句分段），关键词本地分类兜底
+- **"全部"分类无法加载视频** — 同步后点击具体分类再点"全部"，列表清空；`handleCategoryChange` 把 `'全部'` 归一化为空串，触发 `loadVideos(undefined)`
+- **后端绑定 0.0.0.0 暴露局域网** — `config.py` `BACKEND_HOST` 改为 `127.0.0.1`
+- **`?limit` 无上限可被滥用** — `sync.py` 钳制上限为 `MAX_SYNC_LIMIT`，防止资源耗尽
+- **重启后僵尸 running 任务永久阻塞新同步** — `main.py` lifespan 调用 `cleanup_zombie_tasks()`，将残留 running 标记为 failed
+- **用户取消被 complete_task 覆盖为 completed** — `sync_service` 用 `was_cancelled` 标记区分取消和完成
+- **`limit=0` 除零崩溃 + 全重复视频进度卡 0%** — 用 `max(len(new_videos), 1)` 做除数，进度基于实际视频数而非 limit
+- **`fail_task` 自身失败致任务卡 running** — 新增 `_safe_fail_task` 包装，try/except 防止级联失败
+- **单个详情页 `new_page` 失败中止整条同步** — 捕获异常后跳过该视频的增强而非中止
+- **SSE 生成器无 DB 异常保护，连接静默中断** — 异常时推送错误事件而非静默断开
+- **EventSource 泄漏（重复点击同步）** — `useSync.ts` `start` 开头先 `cleanup()` 旧连接，赋值前再清理一次
+- **SSE 字段缺失导致 `undefined%` 渲染** — `progress ?? 0`、`current_title || ''` 兜底
+- **切换分类后 `selectedIds`/`imgErrors`/`expandedTitles` 残留** — `VideoTable` `useEffect` 监听 `videos` 变化时清空三个 Set
+- **`allSelected` 用 size 比较致全选状态误判** — 改用 `videos.every(v => selectedIds.has(v.id))` 内容比较
+- **移动端复选框 absolute 定位错乱** — 卡片容器加 `relative`，为 absolute 复选框提供定位上下文
+- **Firefox 下载 Markdown 静默失败** — `appendChild` 到 body + 延迟 1s 再 `revokeObjectURL`
+- **删除视频后分类列表不刷新，空分类残留** — `onVideosChange` 同步调用 `getCategories()`
+
+### Added
+- **AI 本地兜底分类关键词表** — `ai_service.py` `_local_fallback`，AI 失败时基于关键词匹配分类
+- **CODE_WIKI.md** — 项目架构与模块说明文档
+
+### Changed
+- **AI 路由策略调整** — 仅当 desc 完全为空才走 VL 模式，短描述统一走 TEXT 模式，避免视频 URL 不可访问导致超时
+- **AGENTS.md** — 同步提交历史 + 新增 2 条已知注意事项（后端绑定 127.0.0.1、GLM 限流重试）
+
 ## [1.3.0] - 2026-06-28
 
 ### Fixed

@@ -186,7 +186,7 @@ fcbdc7b fix: 修复安全漏洞、同步崩溃、启动脚本闪退
 c791cb4 refactor: 架构优化 - 分层架构、SQLite、组件化前端
 ```
 
-> 完整更新内容见 [UPDATE.md](UPDATE.md)
+> 完整更新内容见 [CHANGELOG.md](CHANGELOG.md)
 
 ## 未来方向
 
