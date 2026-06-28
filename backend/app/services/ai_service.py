@@ -8,6 +8,16 @@ from app.core.config import ZHIPUAI_API_KEY, ZHIPUAI_CHAT_URL, ZHIPUAI_MODEL
 
 logger = logging.getLogger(__name__)
 
+_PLAYER_TIME_RE = re.compile(r'\d{1,2}:\d{2}(?::\d{2})?\s*/\s*\d{1,2}:\d{2}(?::\d{2})?')
+
+def _looks_like_player_ui(text: str) -> bool:
+    """描述文本含播放器 UI 特征时视为无效"""
+    if _PLAYER_TIME_RE.search(text):
+        return True
+    if "倍速" in text and ("清屏" in text or "连播" in text):
+        return True
+    return False
+
 CATEGORIES = [
     "技术/编程", "生活vlog", "美食", "旅行", "游戏", "搞笑",
     "知识/教育", "音乐", "运动健身", "美妆时尚", "影视", "其他",
@@ -31,6 +41,10 @@ async def generate_summary_and_category(
 ) -> Tuple[str, str]:
     if not ZHIPUAI_API_KEY:
         return _fallback_summary(title, desc), "未分类"
+
+    # 过滤播放器 UI 文本（二次防护）
+    if _looks_like_player_ui(desc):
+        desc = ""
 
     use_vl = bool(video_url and len(desc.strip()) < 50)
 

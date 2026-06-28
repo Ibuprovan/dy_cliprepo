@@ -44,16 +44,19 @@ VIDEO_COVER_SELECTORS = [
 
 # ==================== 视频详情页 ====================
 # 详情页描述文本（通常更完整）
-# 抖音页面结构：描述通常在 video-info 区域内的特定 class
+# 注意：避免使用 [class*="title"]，会匹配到播放器叠加层的含 "00:00/00:00 倍速" 时间戳文本
 VIDEO_DESC_DETAIL_SELECTORS = [
     '[class*="video-info"] [class*="desc"]',
-    '[class*="video-info"] [class*="title"]',
+    '[class*="video-info"] [class*="content"]',
+    '[class*="desc-container"]',
     '[class*="desc-text"]',
     '[data-e2e*="video-desc"]',
+    '[data-e2e*="desc"]',
     '[class*="video-detail"]',
-    # 兜底：通用选择器
-    '[class*="desc"]',
-    '[class*="title"]',
+    # 兜底：只匹配 class 含 desc 的（避免 title 类）
+    'span[class*="desc"]',
+    'div[class*="desc"]',
+    'p[class*="desc"]',
 ]
 
 # 视频源地址（video 标签内的 src）
@@ -72,18 +75,13 @@ VIDEO_PAGE_ERROR_KEYWORDS = [
     "该视频已被作者删除",
 ]
 
-# 详情页无意义文本过滤（跳过导航栏/搜索等 UI 文本）
+# 详情页无意义文本过滤（跳过导航栏/播放器 UI 等）
 VIDEO_PAGE_NOISE_KEYWORDS = [
-    "搜索",
-    "登录",
-    "注册",
-    "关注",
-    "点赞",
-    "评论",
-    "分享",
-    "首页",
-    "推荐",
-    "朋友",
+    "倍速",
+    "清屏",
+    "连播",
+    "章节要点",
+    "智能",
 ]
 
 # ==================== 收藏页面 ====================

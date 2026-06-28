@@ -166,16 +166,26 @@ async def _extract_video_info(item) -> Optional[Dict]:
         return None
 
 
+import re as _re
+
+# 播放器时间显示正则（如 00:00 / 00:00, 1:23:45 / 10:00）
+_PLAYER_TIME_RE = _re.compile(r'\d{1,2}:\d{2}(?::\d{2})?\s*/\s*\d{1,2}:\d{2}(?::\d{2})?')
+
+
 def _is_noise_text(text: str) -> bool:
-    """检查文本是否是无意义的导航/错误文本"""
+    """检查文本是否是无意义的播放器 UI/导航/错误文本"""
     text = text.strip()
     if len(text) < 15:
         return True
     for kw in VIDEO_PAGE_ERROR_KEYWORDS:
         if kw in text:
             return True
-    noise_count = sum(1 for kw in VIDEO_PAGE_NOISE_KEYWORDS if kw in text)
-    if noise_count >= 3:
+    # 播放器控制条文本特征：倍速/清屏/连播/章节要点同时出现
+    player_hits = sum(1 for kw in VIDEO_PAGE_NOISE_KEYWORDS if kw in text)
+    if player_hits >= 2:
+        return True
+    # 播放器时间显示（00:00 / 00:00 开头）是典型播放器 UI
+    if _PLAYER_TIME_RE.search(text):
         return True
     return False
 
