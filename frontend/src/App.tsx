@@ -87,7 +87,7 @@ export default function App() {
     return (
       <Layout authExists={authExists} onLogout={handleLogout}>
         <div className="flex justify-center items-center h-64">
-          <div className="text-gray-500">加载中...</div>
+          <div className="text-ink-400 text-sm tracking-tight">加载中...</div>
         </div>
       </Layout>
     );
@@ -98,14 +98,14 @@ export default function App() {
     return (
       <Layout authExists={authExists} onLogout={handleLogout}>
         <div className="flex justify-center items-center h-64">
-          <div className="bg-white rounded-lg shadow-sm border border-red-200 p-8 max-w-md text-center">
-            <h1 className="text-xl font-bold text-red-600 mb-4">
-              ⚠️ 后端服务未启动
+          <div className="bg-surface-50 rounded-lg border border-danger-border p-8 max-w-md text-center shadow-sm">
+            <h1 className="text-base font-bold text-danger mb-4 tracking-tight">
+              后端服务未启动
             </h1>
-            <p className="text-gray-600 mb-6">
+            <p className="text-ink-500 text-sm mb-6 tracking-tight">
               请先运行 start.bat 启动服务，或手动启动后端：
             </p>
-            <code className="block bg-gray-100 rounded-md p-3 text-sm text-gray-800">
+            <code className="block bg-brand-100 rounded-md p-3 text-xs text-ink-800 tracking-tight">
               cd backend && python run_server.py
             </code>
           </div>

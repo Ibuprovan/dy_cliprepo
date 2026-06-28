@@ -1,5 +1,5 @@
 /**
- * 同步控制面板组件
+ * 同步控制面板组件 — 极简设计系统
  */
 
 import { useState } from 'react';
@@ -25,16 +25,17 @@ export function SyncPanel({ authExists, syncState, onStart, onStop }: SyncPanelP
   const [limit, setLimit] = useState(10);
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+    <div className="bg-surface-50 rounded-lg border border-brand-200 p-6 mb-6 shadow-sm">
       <div className="flex justify-between items-center mb-4">
-        <h2 className="text-lg font-semibold text-gray-900">同步收藏</h2>
+        <h2 className="text-sm font-semibold text-ink-900 tracking-tight uppercase">
+          同步收藏
+        </h2>
         <div className="flex items-center gap-3">
-          {/* 数量选择 */}
           <select
             disabled={isRunning}
             value={limit}
             onChange={(e) => setLimit(Number(e.target.value))}
-            className="text-sm border border-gray-300 rounded-md px-3 py-2 bg-white text-gray-700 disabled:opacity-50"
+            className="text-xs border border-brand-200 rounded-md px-3 py-2 bg-surface-50 text-ink-700 disabled:opacity-50 tracking-tight focus:outline-none focus:ring-1 focus:ring-brand-900"
           >
             {LIMIT_OPTIONS.map((opt) => (
               <option key={opt.value} value={opt.value}>
@@ -45,12 +46,12 @@ export function SyncPanel({ authExists, syncState, onStart, onStop }: SyncPanelP
           <button
             onClick={isRunning ? onStop : () => onStart(limit)}
             disabled={!authExists && !isRunning}
-            className={`px-6 py-2 rounded-md font-medium text-sm transition-colors ${
+            className={`px-5 py-2 rounded-md font-medium text-xs tracking-tight transition-colors ${
               isRunning
-                ? 'bg-red-500 hover:bg-red-600 text-white'
+                ? 'bg-danger text-white hover:bg-danger-text'
                 : authExists
-                  ? 'bg-blue-500 hover:bg-blue-600 text-white'
-                  : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                  ? 'bg-brand-900 text-brand-50 hover:bg-brand-800'
+                  : 'bg-brand-100 text-ink-400 cursor-not-allowed'
             }`}
           >
             {isRunning ? '停止同步' : '开始同步'}
@@ -60,21 +61,21 @@ export function SyncPanel({ authExists, syncState, onStart, onStop }: SyncPanelP
 
       {/* 登录提示 */}
       {!authExists && !isRunning && (
-        <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4 mb-4">
-          <p className="text-yellow-800 text-sm">
-            请先运行 <code className="bg-yellow-100 px-1 py-0.5 rounded">backend/login_manual.py</code> 完成抖音登录
+        <div className="bg-warning-subtle border border-warning-border rounded-md p-4 mb-4">
+          <p className="text-warning-text text-xs tracking-tight">
+            请先运行 <code className="bg-brand-100 px-1.5 py-0.5 rounded text-xs">backend/login_manual.py</code> 完成抖音登录
           </p>
         </div>
       )}
 
       {/* 同步消息 */}
       {message && (
-        <div className={`rounded-md p-4 mb-4 text-sm ${
+        <div className={`rounded-md p-4 mb-4 text-xs tracking-tight ${
           message.includes('完成')
-            ? 'bg-green-50 text-green-800'
+            ? 'bg-success-subtle text-success-text border border-success-border'
             : message.includes('失败') || message.includes('错误')
-              ? 'bg-red-50 text-red-800'
-              : 'bg-blue-50 text-blue-800'
+              ? 'bg-danger-subtle text-danger-text border border-danger-border'
+              : 'bg-brand-100 text-ink-600 border border-brand-200'
         }`}>
           {message}
         </div>
@@ -83,13 +84,13 @@ export function SyncPanel({ authExists, syncState, onStart, onStop }: SyncPanelP
       {/* 进度条 */}
       {isRunning && (
         <div>
-          <div className="flex justify-between text-sm text-gray-600 mb-2">
+          <div className="flex justify-between text-xs text-ink-400 mb-2 tracking-tight">
             <span>当前处理：{currentTitle || '准备中...'}</span>
             <span>{progress}%</span>
           </div>
-          <div className="w-full bg-gray-200 rounded-full h-2">
+          <div className="w-full bg-brand-100 rounded-full h-1.5">
             <div
-              className="bg-blue-500 h-2 rounded-full transition-all duration-300"
+              className="bg-brand-900 h-1.5 rounded-full transition-all duration-300"
               style={{ width: `${progress}%` }}
             />
           </div>
