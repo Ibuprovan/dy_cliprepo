@@ -146,6 +146,8 @@ GET /api/debug/logs?n=100&level=INFO
 8. **前端使用 Tailwind v4** — 用 `@tailwindcss/vite` 插件，不是 PostCSS 配置。样式用 Tailwind 工具类写在 JSX 中。
 9. **数据目录被 gitignore** — `backend/data/` 不在仓库中。首次运行通过 `ensure_dirs()` 自动创建
 10. **Playwright 浏览器二进制** — 不在仓库中，venv 创建后必须运行 `playwright install chromium`
+11. **后端绑定 127.0.0.1** — 本地工具只监听回环接口，不对外暴露。AGENTS.md 早期版本的 `0.0.0.0` 已修正。
+12. **GLM 限流** — 免费模型 `glm-4.6v-flash` 触发 429 时自动重试 3 次（间隔 2/4/6 秒）。完全失败走本地兜底（智能提取 + 关键词分类）。
 
 ## API 路由表
 
@@ -168,6 +170,10 @@ GET /api/debug/logs?n=100&level=INFO
 ## 最近提交历史
 
 ```
+feat: 重写 AI 摘要：429 重试 + 智能 fallback + 本地分类
+fix: 修复同步后点击"全部"分类无法加载视频
+fix: 15 项 bug 与安全修复（后端安全/任务状态/SSE + 前端状态管理/UI）
+docs: 添加 UPDATE.md 更新日志 + AGENTS.md 同步
 f1e30c4 fix: 过滤播放器UI文本防止AI总结倍速/清屏/连播/时间戳等垃圾内容
 4cf6468 fix: AI总结质量修复 + 调试日志系统
 f3a0689 feat: 多选视频批量删除 + 一键全选
@@ -179,6 +185,8 @@ f3a0689 feat: 多选视频批量删除 + 一键全选
 fcbdc7b fix: 修复安全漏洞、同步崩溃、启动脚本闪退
 c791cb4 refactor: 架构优化 - 分层架构、SQLite、组件化前端
 ```
+
+> 完整更新内容见 [UPDATE.md](UPDATE.md)
 
 ## 未来方向
 
