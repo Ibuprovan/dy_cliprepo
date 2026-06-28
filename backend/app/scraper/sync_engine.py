@@ -35,6 +35,7 @@ from app.scraper.selectors import (
     VIDEO_LINK_SELECTORS,
     VIDEO_TITLE_SELECTORS,
     VIDEO_DESC_SELECTORS,
+    VIDEO_COVER_SELECTORS,
     FAVORITE_TAB_SELECTORS,
 )
 
@@ -123,6 +124,16 @@ async def _extract_video_info(item) -> Optional[Dict]:
         # 获取作者（抖音收藏页面可能不显示作者，留空）
         author = ""
         
+        # 获取封面图片
+        cover_url = ""
+        for selector in VIDEO_COVER_SELECTORS:
+            cover_el = await item.query_selector(selector)
+            if cover_el:
+                src = await cover_el.get_attribute("src")
+                if src:
+                    cover_url = src.strip()
+                    break
+        
         # 获取描述（从p标签获取）
         desc = ""
         for selector in VIDEO_DESC_SELECTORS:
@@ -141,6 +152,7 @@ async def _extract_video_info(item) -> Optional[Dict]:
             "title": title.strip(),
             "author": author.strip(),
             "desc": desc.strip(),
+            "cover_url": cover_url,
             "scraped_at": datetime.now().isoformat(),
         }
     except Exception as e:

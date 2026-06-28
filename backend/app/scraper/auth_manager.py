@@ -205,3 +205,16 @@ def get_auth_file_path() -> Path:
 def is_auth_exists() -> bool:
     """检查登录态文件是否存在"""
     return AUTH_FILE.exists()
+
+
+def delete_auth() -> bool:
+    """删除登录态文件"""
+    if not AUTH_FILE.exists():
+        return False
+    try:
+        AUTH_FILE.unlink()
+        logger.info("登录态文件已删除")
+        return True
+    except Exception as e:
+        logger.error(f"删除登录态文件失败: {e}")
+        return False

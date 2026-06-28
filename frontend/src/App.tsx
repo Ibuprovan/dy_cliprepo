@@ -4,7 +4,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { checkHealth, getVideos } from './api/client';
+import { checkHealth, getVideos, getCategories, logout } from './api/client';
 import { useSync } from './hooks/useSync';
 import { Layout } from './components/Layout';
 import { SyncPanel } from './components/SyncPanel';
@@ -15,22 +15,34 @@ export default function App() {
   const [backendOk, setBackendOk] = useState<boolean | null>(null);
   const [authExists, setAuthExists] = useState(false);
   const [videos, setVideos] = useState<Video[]>([]);
+  const [categories, setCategories] = useState<string[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState('');
   const [loading, setLoading] = useState(true);
 
-  // 加载视频列表
-  const loadVideos = useCallback(async () => {
+  // 加载视频列表（根据当前分类筛选）
+  const loadVideos = useCallback(async (category?: string) => {
     try {
-      const data = await getVideos();
+      const data = await getVideos(100, 0, category || undefined);
       setVideos(data.items as Video[]);
     } catch (e) {
-      console.error('加载视频失败:', e);  // 修复 #8: 不再静默吞掉错误
+      console.error('加载视频失败:', e);
     }
   }, []);
 
+  // 分类切换回调
+  const handleCategoryChange = useCallback((cat: string) => {
+    setSelectedCategory(cat);
+    loadVideos(cat || undefined);
+  }, [loadVideos]);
+
   // 同步完成回调
   const handleSyncComplete = useCallback(() => {
-    loadVideos();
-  }, [loadVideos]);
+    loadVideos(selectedCategory || undefined);
+    // 同步后刷新分类列表
+    getCategories().then(data => {
+      if (data.categories.length > 0) setCategories(data.categories);
+    }).catch(() => {});
+  }, [loadVideos, selectedCategory]);
 
   // 同步状态管理
   const sync = useSync(handleSyncComplete);
@@ -42,7 +54,12 @@ export default function App() {
         const health = await checkHealth();
         setBackendOk(true);
         setAuthExists(health.auth_exists);
-        await loadVideos();
+        const [videoData, catData] = await Promise.all([
+          getVideos(),
+          getCategories(),
+        ]);
+        setVideos(videoData.items as Video[]);
+        setCategories(catData.categories);
       } catch {
         setBackendOk(false);
       } finally {
@@ -50,12 +67,24 @@ export default function App() {
       }
     };
     init();
-  }, [loadVideos]);
+  }, []);
+
+  // 退出登录
+  const handleLogout = useCallback(async () => {
+    try {
+      const result = await logout();
+      if (result.success) {
+        setAuthExists(false);
+      }
+    } catch (e) {
+      console.error('退出登录失败:', e);
+    }
+  }, []);
 
   // 加载中状态
   if (loading) {
     return (
-      <Layout>
+      <Layout authExists={authExists} onLogout={handleLogout}>
         <div className="flex justify-center items-center h-64">
           <div className="text-gray-500">加载中...</div>
         </div>
@@ -66,7 +95,7 @@ export default function App() {
   // 后端未启动
   if (backendOk === false) {
     return (
-      <Layout>
+      <Layout authExists={authExists} onLogout={handleLogout}>
         <div className="flex justify-center items-center h-64">
           <div className="bg-white rounded-lg shadow-sm border border-red-200 p-8 max-w-md text-center">
             <h1 className="text-xl font-bold text-red-600 mb-4">
@@ -85,22 +114,22 @@ export default function App() {
   }
 
   return (
-    <Layout>
-      {/* 标题 */}
-      <h1 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
-        🎬 抖音收藏AI知识库
-      </h1>
-
+    <Layout authExists={authExists} onLogout={handleLogout}>
       {/* 同步控制面板 */}
       <SyncPanel
         authExists={authExists}
         syncState={sync}
-        onStart={() => sync.start(10)}
+        onStart={(limit) => sync.start(limit)}
         onStop={sync.stop}
       />
 
       {/* 视频列表 */}
-      <VideoTable videos={videos} />
+      <VideoTable
+        videos={videos}
+        categories={['全部', ...categories]}
+        selectedCategory={selectedCategory}
+        onCategoryChange={handleCategoryChange}
+      />
     </Layout>
   );
 }

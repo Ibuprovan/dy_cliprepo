@@ -43,6 +43,11 @@ export async function getVideos(limit = 100, offset = 0, category?: string) {
   return request<{ items: unknown[]; total: number }>(`/api/videos?${params}`);
 }
 
+// 获取分类列表
+export async function getCategories() {
+  return request<{ categories: string[] }>('/api/videos/categories');
+}
+
 // 启动同步
 export async function startSync(limit = 10) {
   return request<{ task_id: string; status: string; message: string }>(
@@ -83,4 +88,12 @@ export function createSyncSSE(
   };
 
   return eventSource;
+}
+
+// 退出登录
+export async function logout() {
+  return request<{ success: boolean; logged_in: boolean; message: string }>(
+    '/api/auth/logout',
+    { method: 'POST' }
+  );
 }

@@ -20,7 +20,7 @@ from app.models.video import VideoCreate
 from app.repositories import task_repo, video_repo
 from app.scraper.auth_manager import AuthFileNotFoundError, AuthError
 from app.scraper.sync_engine import fetch_favorites_list, SyncError
-from app.services.ai_service import generate_summary
+from app.services.ai_service import generate_summary_and_category
 
 logger = logging.getLogger(__name__)
 
@@ -135,7 +135,7 @@ async def _run_sync_task(task_id: str, limit: int):
                 if video_data["url"] not in existing_urls:
                     title = video_data.get("title", "")
                     desc = video_data.get("desc", "")
-                    summary = await generate_summary(title, desc)
+                    summary, category = await generate_summary_and_category(title, desc)
 
                     video = VideoCreate(
                         url=video_data["url"],
@@ -143,7 +143,8 @@ async def _run_sync_task(task_id: str, limit: int):
                         author=video_data.get("author", ""),
                         desc=desc,
                         summary=summary,
-                        category="未分类",
+                        category=category,
+                        cover_url=video_data.get("cover_url", ""),
                         tags=[],
                         scraped_at=video_data.get("scraped_at", datetime.now().isoformat()),
                     )

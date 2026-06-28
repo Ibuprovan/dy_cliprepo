@@ -12,6 +12,7 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 
+from app.core.config import MAX_SYNC_LIMIT
 from app.scraper.auth_manager import is_auth_exists
 from app.services import sync_service
 
@@ -21,8 +22,8 @@ SSE_TIMEOUT_SECONDS = 1800  # 30 分钟超时（修复 #10: 5 分钟对大量同
 
 
 @router.post("/api/sync/start")
-async def start_sync(limit: int = 10):
-    """启动同步任务"""
+async def start_sync(limit: int = 0):
+    """启动同步任务 (limit=0 表示尽可能多，上限 MAX_SYNC_LIMIT)"""
     if not is_auth_exists():
         raise HTTPException(
             status_code=401,
@@ -36,6 +37,10 @@ async def start_sync(limit: int = 10):
             status_code=409,
             detail="已有同步任务正在运行，请等待完成"
         )
+
+    # limit=0 表示全部，用 MAX_SYNC_LIMIT 兜底
+    if limit <= 0:
+        limit = MAX_SYNC_LIMIT
 
     task_id = f"sync_{uuid.uuid4().hex[:8]}"
 

@@ -35,6 +35,13 @@ VIDEO_DESC_SELECTORS = [
     'p[class]',
 ]
 
+# 视频封面（在视频项内查找图片 src）
+VIDEO_COVER_SELECTORS = [
+    'img[alt]',
+    'img',
+    '[class*="cover"] img',
+]
+
 # ==================== 收藏页面 ====================
 # 收藏标签按钮
 FAVORITE_TAB_SELECTORS = [
