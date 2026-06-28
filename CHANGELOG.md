@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.3.0] - 2026-06-28
+
+### Fixed
+- **AI 总结输出"页面不见啦"等错误文本** — `extract_video_page_info` 增加错误页检测：检查跳转 URL、过滤已知错误关键词、过滤导航/搜索 UI 文本
+- **AI 总结截断/半句话** — `ai_service` 关闭 thinking 模式（输出走稳定的 `content` 字段），`max_tokens` 统一提升到 4096，`_extract_summary` 增加按 `【分类】` 分割的新策略
+- **AI 总结重复标题和描述** — 系统提示词增加"禁止重复标题和描述"，模型输出不再经过不可控的 reasoning 提取
+
+### Added
+- **环形缓冲区日志系统** — `app/core/logger.py` 的 `RingBufferHandler` 保留最近 500 条日志，支持 `/api/debug/logs` 查询
+- **DEBUG API** — `GET /api/debug/logs?n=100&level=INFO` 返回结构化日志（时间、级别、logger、消息），方便调试
+- **AI 输入输出详细日志** — 每次 AI 调用记录 title、desc_len、video_url 状态、原始响应、提取结果，出现质量问题时可通过日志追溯
+
+### Changed
+- **详情页选择器优化** — `selectors.py` 新增优先选择器 `[class*="video-info"] [class*="desc"]`，新增 `VIDEO_PAGE_ERROR_KEYWORDS` 和 `VIDEO_PAGE_NOISE_KEYWORDS` 过滤
+- **`extract_video_page_info` 重构** — 新增 `_is_noise_text()` 校验函数，登录/错误页 URL 检测
+- **`main.py` lifespan** — 启动时调用 `setup_debug_logging()` 初始化日志系统
+
 ## [1.2.0] - 2026-06-28
 
 ### Added

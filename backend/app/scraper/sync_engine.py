@@ -41,6 +41,8 @@ from app.scraper.selectors import (
     FAVORITE_TAB_SELECTORS,
     VIDEO_DESC_DETAIL_SELECTORS,
     VIDEO_SOURCE_SELECTORS,
+    VIDEO_PAGE_ERROR_KEYWORDS,
+    VIDEO_PAGE_NOISE_KEYWORDS,
 )
 
 # 配置日志
@@ -164,34 +166,63 @@ async def _extract_video_info(item) -> Optional[Dict]:
         return None
 
 
+def _is_noise_text(text: str) -> bool:
+    """检查文本是否是无意义的导航/错误文本"""
+    text = text.strip()
+    if len(text) < 15:
+        return True
+    for kw in VIDEO_PAGE_ERROR_KEYWORDS:
+        if kw in text:
+            return True
+    noise_count = sum(1 for kw in VIDEO_PAGE_NOISE_KEYWORDS if kw in text)
+    if noise_count >= 3:
+        return True
+    return False
+
+
 async def extract_video_page_info(page: Page, url: str) -> Dict:
     """
     打开视频详情页，提取完整描述和视频源地址
+    包含错误检测和内容校验，避免将错误页面/导航文本送入 AI
     """
     try:
         await page.goto(url, wait_until="domcontentloaded", timeout=VIDEO_PAGE_TIMEOUT)
         await asyncio.sleep(VIDEO_PAGE_RENDER_WAIT)
 
+        # 检查页面是否跳转到非正常地址（登录页/首页等）
+        current_url = page.url
+        if "login" in current_url or "/error" in current_url:
+            logger.warning(f"视频页跳转到非正常页面: {current_url}")
+            return {"desc": "", "video_src_url": ""}
+
+        # 提取描述（过滤无意义内容）
         full_desc = ""
         for selector in VIDEO_DESC_DETAIL_SELECTORS:
-            el = await page.query_selector(selector)
-            if el:
-                full_desc = await el.inner_text()
-                if full_desc.strip():
+            els = await page.query_selector_all(selector)
+            for el in els:
+                text = (await el.inner_text()).strip()
+                if text and not _is_noise_text(text):
+                    full_desc = text
                     break
+            if full_desc:
+                break
 
+        # 提取视频源地址
         video_src_url = ""
         for selector in VIDEO_SOURCE_SELECTORS:
             el = await page.query_selector(selector)
             if el:
-                video_src_url = await el.get_attribute("src")
-                if video_src_url:
+                url = await el.get_attribute("src")
+                if url:
+                    video_src_url = url.strip()
                     break
 
-        return {
-            "desc": full_desc.strip(),
-            "video_src_url": video_src_url.strip(),
-        }
+        logger.info(
+            f"详情页提取: desc_len={len(full_desc)} "
+            f"video_url={'yes' if video_src_url else 'no'} | {url}"
+        )
+        return {"desc": full_desc, "video_src_url": video_src_url}
+
     except Exception as e:
         logger.warning(f"提取视频详情页信息失败 {url}: {e}")
         return {"desc": "", "video_src_url": ""}

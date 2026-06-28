@@ -15,6 +15,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
 from app.core.config import ensure_dirs, FRONTEND_DIST_DIR
+from app.core.logger import setup_debug_logging
 from app.api.v1 import router as api_router
 from app.scraper.sync_engine import setup_sync_logger
 from app.db.database import init_db, close_db
@@ -29,6 +30,7 @@ async def lifespan(app: FastAPI):
     """应用生命周期管理"""
     # 启动时执行
     ensure_dirs()
+    setup_debug_logging()
     setup_sync_logger()
     await init_db()
     yield
