@@ -179,7 +179,7 @@ dy_cliprepo/
 
 #### main.py - FastAPI 主入口
 
-**文件**: [main.py](file:///c:/Users/Ibuprofen/Desktop/MU.X.Y/05_项目/dy_cliprepo/backend/app/main.py)
+**文件**: [main.py](backend/app/main.py)
 
 **核心职责**:
 - 创建 FastAPI 应用实例
@@ -208,7 +208,7 @@ lifespan 启动
 
 #### run_server.py - 启动脚本
 
-**文件**: [run_server.py](file:///c:/Users/Ibuprofen/Desktop/MU.X.Y/05_项目/dy_cliprepo/backend/run_server.py)
+**文件**: [run_server.py](backend/run_server.py)
 
 **关键设计**:
 - **必须使用此脚本启动**，不能直接用 `uvicorn`
@@ -220,7 +220,7 @@ lifespan 启动
 
 #### config.py - 统一配置
 
-**文件**: [config.py](file:///c:/Users/Ibuprofen/Desktop/MU.X.Y/05_项目/dy_cliprepo/backend/app/core/config.py)
+**文件**: [config.py](backend/app/core/config.py)
 
 **路径设计原则**:
 - 所有路径基于 `BASE_DIR`（项目根目录）派生
@@ -253,7 +253,7 @@ lifespan 启动
 
 #### logger.py - 环形缓冲区日志
 
-**文件**: [logger.py](file:///c:/Users/Ibuprofen/Desktop/MU.X.Y/05_项目/dy_cliprepo/backend/app/core/logger.py)
+**文件**: [logger.py](backend/app/core/logger.py)
 
 **核心类**: `RingBufferHandler`
 
@@ -287,7 +287,7 @@ lifespan 启动
 
 #### database.py - SQLite 异步连接
 
-**文件**: [database.py](file:///c:/Users/Ibuprofen/Desktop/MU.X.Y/05_项目/dy_cliprepo/backend/app/db/database.py)
+**文件**: [database.py](backend/app/db/database.py)
 
 **设计特点**:
 - 使用 `aiosqlite` 实现异步数据库操作
@@ -346,7 +346,7 @@ lifespan 启动
 
 #### video.py - Pydantic 模型
 
-**文件**: [video.py](file:///c:/Users/Ibuprofen/Desktop/MU.X.Y/05_项目/dy_cliprepo/backend/app/models/video.py)
+**文件**: [video.py](backend/app/models/video.py)
 
 **模型层次**:
 
@@ -373,7 +373,7 @@ VideoBase (基础字段)
 
 #### video_repo.py - 视频数据仓库
 
-**文件**: [video_repo.py](file:///c:/Users/Ibuprofen/Desktop/MU.X.Y/05_项目/dy_cliprepo/backend/app/repositories/video_repo.py)
+**文件**: [video_repo.py](backend/app/repositories/video_repo.py)
 
 **安全设计**:
 - **列名白名单** (`ALLOWED_COLUMNS`)：防止 SQL 注入
@@ -402,7 +402,7 @@ VideoBase (基础字段)
 
 #### task_repo.py - 任务状态仓库
 
-**文件**: [task_repo.py](file:///c:/Users/Ibuprofen/Desktop/MU.X.Y/05_项目/dy_cliprepo/backend/app/repositories/task_repo.py)
+**文件**: [task_repo.py](backend/app/repositories/task_repo.py)
 
 **安全设计**:
 - `ALLOWED_TASK_COLUMNS` 白名单：防止 SQL 注入
@@ -424,7 +424,7 @@ VideoBase (基础字段)
 
 #### auth_manager.py - 登录态管理
 
-**文件**: [auth_manager.py](file:///c:/Users/Ibuprofen/Desktop/MU.X.Y/05_项目/dy_cliprepo/backend/app/scraper/auth_manager.py)
+**文件**: [auth_manager.py](backend/app/scraper/auth_manager.py)
 
 **核心原则**:
 - 只保存 `storage_state`（包含 cookies + localStorage）
@@ -457,7 +457,7 @@ VideoBase (基础字段)
 
 #### sync_engine.py - 同步引擎
 
-**文件**: [sync_engine.py](file:///c:/Users/Ibuprofen/Desktop/MU.X.Y/05_项目/dy_cliprepo/backend/app/scraper/sync_engine.py)
+**文件**: [sync_engine.py](backend/app/scraper/sync_engine.py)
 
 **核心原则**: 只读、无头、容错
 
@@ -495,7 +495,7 @@ VideoBase (基础字段)
 
 #### selectors.py - CSS 选择器管理
 
-**文件**: [selectors.py](file:///c:/Users/Ibuprofen/Desktop/MU.X.Y/05_项目/dy_cliprepo/backend/app/scraper/selectors.py)
+**文件**: [selectors.py](backend/app/scraper/selectors.py)
 
 **设计原则**:
 - 抖音 DOM 结构频繁变化，选择器集中管理便于更新
@@ -521,7 +521,7 @@ VideoBase (基础字段)
 
 #### sync_service.py - 同步任务服务
 
-**文件**: [sync_service.py](file:///c:/Users/Ibuprofen/Desktop/MU.X.Y/05_项目/dy_cliprepo/backend/app/services/sync_service.py)
+**文件**: [sync_service.py](backend/app/services/sync_service.py)
 
 **核心设计**: 同步任务在**独立线程**中运行
 
@@ -567,7 +567,7 @@ start_sync()
 
 #### ai_service.py - AI 服务
 
-**文件**: [ai_service.py](file:///c:/Users/Ibuprofen/Desktop/MU.X.Y/05_项目/dy_cliprepo/backend/app/services/ai_service.py)
+**文件**: [ai_service.py](backend/app/services/ai_service.py)
 
 **AI 模型**: `glm-4.6v-flash`（智谱免费多模态模型）
 
@@ -622,7 +622,7 @@ start_sync()
 
 #### 路由聚合
 
-**文件**: [__init__.py](file:///c:/Users/Ibuprofen/Desktop/MU.X.Y/05_项目/dy_cliprepo/backend/app/api/v1/__init__.py)
+**文件**: [__init__.py](backend/app/api/v1/__init__.py)
 
 **路由挂载**:
 - `/health` → health_router
@@ -633,7 +633,7 @@ start_sync()
 
 #### health.py - 健康检查
 
-**文件**: [health.py](file:///c:/Users/Ibuprofen/Desktop/MU.X.Y/05_项目/dy_cliprepo/backend/app/api/v1/health.py)
+**文件**: [health.py](backend/app/api/v1/health.py)
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
@@ -641,7 +641,7 @@ start_sync()
 
 #### videos.py - 视频管理
 
-**文件**: [videos.py](file:///c:/Users/Ibuprofen/Desktop/MU.X.Y/05_项目/dy_cliprepo/backend/app/api/v1/videos.py)
+**文件**: [videos.py](backend/app/api/v1/videos.py)
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
@@ -654,7 +654,7 @@ start_sync()
 
 #### sync.py - 同步任务
 
-**文件**: [sync.py](file:///c:/Users/Ibuprofen/Desktop/MU.X.Y/05_项目/dy_cliprepo/backend/app/api/v1/sync.py)
+**文件**: [sync.py](backend/app/api/v1/sync.py)
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
@@ -666,7 +666,7 @@ start_sync()
 
 #### auth.py - 认证管理
 
-**文件**: [auth.py](file:///c:/Users/Ibuprofen/Desktop/MU.X.Y/05_项目/dy_cliprepo/backend/app/api/v1/auth.py)
+**文件**: [auth.py](backend/app/api/v1/auth.py)
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
@@ -675,7 +675,7 @@ start_sync()
 
 #### debug.py - 调试日志
 
-**文件**: [debug.py](file:///c:/Users/Ibuprofen/Desktop/MU.X.Y/05_项目/dy_cliprepo/backend/app/api/v1/debug.py)
+**文件**: [debug.py](backend/app/api/v1/debug.py)
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
@@ -715,7 +715,7 @@ frontend/src/
 
 #### App.tsx - 主应用
 
-**文件**: [App.tsx](file:///c:/Users/Ibuprofen/Desktop/MU.X.Y/05_项目/dy_cliprepo/frontend/src/App.tsx)
+**文件**: [App.tsx](frontend/src/App.tsx)
 
 **状态管理**:
 - `backendOk`: 后端服务是否可用
@@ -735,7 +735,7 @@ useEffect 挂载
 
 #### Layout.tsx - 布局组件
 
-**文件**: [Layout.tsx](file:///c:/Users/Ibuprofen/Desktop/MU.X.Y/05_项目/dy_cliprepo/frontend/src/components/Layout.tsx)
+**文件**: [Layout.tsx](frontend/src/components/Layout.tsx)
 
 **结构**:
 - 顶部导航栏（标题 + 退出登录按钮）
@@ -743,7 +743,7 @@ useEffect 挂载
 
 #### SyncPanel.tsx - 同步控制面板
 
-**文件**: [SyncPanel.tsx](file:///c:/Users/Ibuprofen/Desktop/MU.X.Y/05_项目/dy_cliprepo/frontend/src/components/SyncPanel.tsx)
+**文件**: [SyncPanel.tsx](frontend/src/components/SyncPanel.tsx)
 
 **功能**:
 - 同步数量选择（10/30/50/全部）
@@ -754,7 +754,7 @@ useEffect 挂载
 
 #### VideoTable.tsx - 视频列表
 
-**文件**: [VideoTable.tsx](file:///c:/Users/Ibuprofen/Desktop/MU.X.Y/05_项目/dy_cliprepo/frontend/src/components/VideoTable.tsx)
+**文件**: [VideoTable.tsx](frontend/src/components/VideoTable.tsx)
 
 **功能**:
 - 分类筛选标签（全部 + 各分类）
@@ -771,7 +771,7 @@ useEffect 挂载
 
 #### useSync.ts - 同步状态管理
 
-**文件**: [useSync.ts](file:///c:/Users/Ibuprofen/Desktop/MU.X.Y/05_项目/dy_cliprepo/frontend/src/hooks/useSync.ts)
+**文件**: [useSync.ts](frontend/src/hooks/useSync.ts)
 
 **SyncState 接口**:
 ```typescript
@@ -807,7 +807,7 @@ interface SyncState {
 
 #### client.ts - API 封装
 
-**文件**: [client.ts](file:///c:/Users/Ibuprofen/Desktop/MU.X.Y/05_项目/dy_cliprepo/frontend/src/api/client.ts)
+**文件**: [client.ts](frontend/src/api/client.ts)
 
 **设计原则**:
 - 使用 Vite proxy，相对路径即可（无需硬编码后端地址）
@@ -830,7 +830,7 @@ interface SyncState {
 
 ### 4.6 类型定义
 
-**文件**: [types/index.ts](file:///c:/Users/Ibuprofen/Desktop/MU.X.Y/05_项目/dy_cliprepo/frontend/src/types/index.ts)
+**文件**: [types/index.ts](frontend/src/types/index.ts)
 
 **主要类型**:
 - `Video` - 视频数据类型
@@ -1309,31 +1309,31 @@ Stop-Process -Name python -Force
 
 | 文件 | 职责 |
 |------|------|
-| [main.py](file:///c:/Users/Ibuprofen/Desktop/MU.X.Y/05_项目/dy_cliprepo/backend/app/main.py) | FastAPI 入口 + 生命周期 |
-| [run_server.py](file:///c:/Users/Ibuprofen/Desktop/MU.X.Y/05_项目/dy_cliprepo/backend/run_server.py) | 启动脚本（Windows 兼容） |
-| [config.py](file:///c:/Users/Ibuprofen/Desktop/MU.X.Y/05_项目/dy_cliprepo/backend/app/core/config.py) | 全局配置 + 路径管理 |
-| [logger.py](file:///c:/Users/Ibuprofen/Desktop/MU.X.Y/05_项目/dy_cliprepo/backend/app/core/logger.py) | 环形缓冲区日志系统 |
-| [database.py](file:///c:/Users/Ibuprofen/Desktop/MU.X.Y/05_项目/dy_cliprepo/backend/app/db/database.py) | SQLite 异步连接 |
-| [video.py](file:///c:/Users/Ibuprofen/Desktop/MU.X.Y/05_项目/dy_cliprepo/backend/app/models/video.py) | 视频数据模型 |
-| [video_repo.py](file:///c:/Users/Ibuprofen/Desktop/MU.X.Y/05_项目/dy_cliprepo/backend/app/repositories/video_repo.py) | 视频数据仓库 |
-| [task_repo.py](file:///c:/Users/Ibuprofen/Desktop/MU.X.Y/05_项目/dy_cliprepo/backend/app/repositories/task_repo.py) | 任务状态仓库 |
-| [auth_manager.py](file:///c:/Users/Ibuprofen/Desktop/MU.X.Y/05_项目/dy_cliprepo/backend/app/scraper/auth_manager.py) | 登录态管理 |
-| [sync_engine.py](file:///c:/Users/Ibuprofen/Desktop/MU.X.Y/05_项目/dy_cliprepo/backend/app/scraper/sync_engine.py) | 同步引擎（Playwright） |
-| [selectors.py](file:///c:/Users/Ibuprofen/Desktop/MU.X.Y/05_项目/dy_cliprepo/backend/app/scraper/selectors.py) | CSS 选择器集中管理 |
-| [sync_service.py](file:///c:/Users/Ibuprofen/Desktop/MU.X.Y/05_项目/dy_cliprepo/backend/app/services/sync_service.py) | 同步任务服务（独立线程） |
-| [ai_service.py](file:///c:/Users/Ibuprofen/Desktop/MU.X.Y/05_项目/dy_cliprepo/backend/app/services/ai_service.py) | AI 总结 + 分类 |
+| [main.py](backend/app/main.py) | FastAPI 入口 + 生命周期 |
+| [run_server.py](backend/run_server.py) | 启动脚本（Windows 兼容） |
+| [config.py](backend/app/core/config.py) | 全局配置 + 路径管理 |
+| [logger.py](backend/app/core/logger.py) | 环形缓冲区日志系统 |
+| [database.py](backend/app/db/database.py) | SQLite 异步连接 |
+| [video.py](backend/app/models/video.py) | 视频数据模型 |
+| [video_repo.py](backend/app/repositories/video_repo.py) | 视频数据仓库 |
+| [task_repo.py](backend/app/repositories/task_repo.py) | 任务状态仓库 |
+| [auth_manager.py](backend/app/scraper/auth_manager.py) | 登录态管理 |
+| [sync_engine.py](backend/app/scraper/sync_engine.py) | 同步引擎（Playwright） |
+| [selectors.py](backend/app/scraper/selectors.py) | CSS 选择器集中管理 |
+| [sync_service.py](backend/app/services/sync_service.py) | 同步任务服务（独立线程） |
+| [ai_service.py](backend/app/services/ai_service.py) | AI 总结 + 分类 |
 
 ### 前端核心文件
 
 | 文件 | 职责 |
 |------|------|
-| [App.tsx](file:///c:/Users/Ibuprofen/Desktop/MU.X.Y/05_项目/dy_cliprepo/frontend/src/App.tsx) | 主应用组件 |
-| [client.ts](file:///c:/Users/Ibuprofen/Desktop/MU.X.Y/05_项目/dy_cliprepo/frontend/src/api/client.ts) | API 客户端封装 |
-| [useSync.ts](file:///c:/Users/Ibuprofen/Desktop/MU.X.Y/05_项目/dy_cliprepo/frontend/src/hooks/useSync.ts) | 同步状态 Hook |
-| [Layout.tsx](file:///c:/Users/Ibuprofen/Desktop/MU.X.Y/05_项目/dy_cliprepo/frontend/src/components/Layout.tsx) | 布局组件 |
-| [SyncPanel.tsx](file:///c:/Users/Ibuprofen/Desktop/MU.X.Y/05_项目/dy_cliprepo/frontend/src/components/SyncPanel.tsx) | 同步控制面板 |
-| [VideoTable.tsx](file:///c:/Users/Ibuprofen/Desktop/MU.X.Y/05_项目/dy_cliprepo/frontend/src/components/VideoTable.tsx) | 视频列表卡片 |
-| [index.ts](file:///c:/Users/Ibuprofen/Desktop/MU.X.Y/05_项目/dy_cliprepo/frontend/src/types/index.ts) | TypeScript 类型定义 |
+| [App.tsx](frontend/src/App.tsx) | 主应用组件 |
+| [client.ts](frontend/src/api/client.ts) | API 客户端封装 |
+| [useSync.ts](frontend/src/hooks/useSync.ts) | 同步状态 Hook |
+| [Layout.tsx](frontend/src/components/Layout.tsx) | 布局组件 |
+| [SyncPanel.tsx](frontend/src/components/SyncPanel.tsx) | 同步控制面板 |
+| [VideoTable.tsx](frontend/src/components/VideoTable.tsx) | 视频列表卡片 |
+| [index.ts](frontend/src/types/index.ts) | TypeScript 类型定义 |
 
 ---
 
